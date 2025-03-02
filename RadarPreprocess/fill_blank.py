@@ -1,28 +1,25 @@
 import math
 import time
 from PIL import Image, ImageDraw
-import consts
+from RadarPreprocess import consts
 import os
 from tqdm import tqdm
 
 
-def get_neighbour_component_size(refer_image_path, neighbour_coordinate, is_strict):
+def get_neighbour_component_size(refer_image, neighbour_coordinate, is_strict):
     """
     get the size of the connected component that a given neighbour belong to
-    :param refer_image_path: path of image that describes the relationship of pixels
-    :param neighbour_coordinate: a coordinate of neighbour
+    :param refer_image: a PIL image object describes the adjacent relationship of given pixel
+    :param neighbour_coordinate: the coordinate of neighbour, which is used for getting the target color
     :param is_strict: a boolean value that indicates whether the neighbour relationship check is strict or not
     :return: an int vlue that refer to the size of connected component
     """
     # get neighbour coordinate offset according to the flag
     if is_strict:
-        neighbour_offsets = [(0, -1), (0, 1), (-1, 0), (1, 0)]
+        neighbour_offsets = consts.surrounding_offsets
     else:
         neighbour_offsets = [(0, -1), (0, 1), (-1, 0), (1, 0),
                              (-1, -1), (1, -1), (-1, 1), (1, 1)]
-
-    # open the refer image
-    refer_image = Image.open(refer_image_path)
 
     # get target color of the given neighbour
     target_color = refer_image.getpixel(neighbour_coordinate)
@@ -64,6 +61,40 @@ def get_neighbour_component_size(refer_image_path, neighbour_coordinate, is_stri
     return len(component)
 
 
+def get_complex_fill_color(radar_img, current_coordinate, surrounding_values):
+    """
+    A dependency function for getting the color that for current coordinate by using complex filling
+    :param radar_img: a PIL image object that is used for getting the connected component size of neighbour echo
+    :param current_coordinate: the coordinate of current blank pixel that need complex filling
+    :param surrounding_values: list of surrounding neighbour pixel values
+    :return: an echo value for filling
+    """
+    # get surrounding enclosure size
+    surrounding_sizes = [0, 0, 0, 0]
+    for idx in range(len(surrounding_values)):
+        # filter out blank neighbour pixel
+        if consts.is_color_equal(surrounding_values[idx], (0, 0, 0), 10):
+            continue
+
+        # get size enclosure for surrounding echo
+        surrounding_sizes[idx] = get_neighbour_component_size(radar_img,
+                                                             (current_coordinate[0] + consts.surrounding_offsets[idx][0],
+                                                              current_coordinate[1] + consts.surrounding_offsets[idx][1]), True)
+        # process accelerate
+        if surrounding_sizes[idx] >= consts.narrow_fill_threshold:
+            return surrounding_values[idx]
+
+    # iterate the surrounding enclosure size to get maximum size neighbour
+    max_len = 0
+    max_len_idx = 0
+    for idx in range(len(surrounding_sizes)):
+        if surrounding_sizes[idx] > max_len:
+            max_len = surrounding_sizes[idx]
+            max_len_idx = idx
+
+    return surrounding_values[max_len_idx]
+
+
 def narrow_fill(folder_path, radar_read_path):
     """
     Filling narrow blank area in radar image that covered radar image mark.
@@ -88,9 +119,6 @@ def narrow_fill(folder_path, radar_read_path):
     debug_img = Image.open(consts.v_base_path)
     debug_draw = ImageDraw.Draw(debug_img)
 
-    # set surrounding coordinate offset array
-    surrounding_offset = [(0, 1), (0, -1), (-1, 0), (1, 0)]
-
     total_iterations = (consts.radar_area[1] - consts.radar_area[0]) ** 2
     with tqdm(total=total_iterations, desc="  Filling Progress", unit="pixels") as pbar:
         for x in range(consts.radar_area[0], consts.radar_area[1]):
@@ -105,7 +133,7 @@ def narrow_fill(folder_path, radar_read_path):
 
                 # get surrounding pixel value
                 surroundings_value = []
-                for offset in surrounding_offset:
+                for offset in consts.surrounding_offsets:
                     neighbour_value = radar_img.getpixel((x + offset[0], y + offset[1]))
                     surroundings_value.append(neighbour_value)
 
@@ -157,40 +185,11 @@ def narrow_fill(folder_path, radar_read_path):
                     pbar.update(1)
                     continue
 
-                # get surrounding enclosure size
-                surrounding_size = [0, 0, 0, 0]
-                is_filled = False
-                for idx in range(len(surroundings_value)):
-                    # filter out blank neighbour pixel
-                    if consts.is_color_equal(surroundings_value[idx], (0, 0, 0), 10):
-                        continue
-
-                    # get size enclosure for surrounding echo
-                    surrounding_size[idx] = get_neighbour_component_size(radar_read_path,
-                                                                         (x + surrounding_offset[idx][0],
-                                                                           y + surrounding_offset[idx][1]), True)
-                    # process accelerate
-                    if surrounding_size[idx] >= consts.narrow_fill_threshold:
-                        fill_draw.point((x, y), surroundings_value[idx])
-                        debug_draw.point((x, y), surroundings_value[idx])
-                        is_filled = True
-                        break
-
-                if is_filled:
-                    pbar.update(1)
-                    continue
-
-                # iterate the surrounding enclosure size to get maximum size neighbour
-                max_len = 0
-                max_len_idx = 0
-                for idx in range(len(surrounding_size)):
-                    if surrounding_size[idx] > max_len:
-                        max_len = surrounding_size[idx]
-                        max_len_idx = idx
+                complex_filled_value = get_complex_fill_color(radar_img, (x, y), surroundings_value)
 
                 # fill blank
-                fill_draw.point((x, y), surroundings_value[max_len_idx])
-                debug_draw.point((x, y), surroundings_value[max_len_idx])
+                fill_draw.point((x, y), complex_filled_value)
+                debug_draw.point((x, y), complex_filled_value)
                 pbar.update(1)
 
     # save test image
@@ -209,16 +208,19 @@ def narrow_fill(folder_path, radar_read_path):
 
 def get_color_index(pixel_value):
     """
-    this is a dependency function which take a rgb color and then return
-    color index that negative value stand for neg and positive value stand for pos
+    a dependency function that read a rgb color value
+    and then return the index in color_velocity_pair of consts.py or -1 if value is not matched
+    :param pixel_value: rgb color value
+    :return: int value
     """
-    for neg_index in range(len(consts.negative_scale)):
-        if consts.is_color_equal(pixel_value, consts.negative_scale[neg_index], 10):
-            return -1 * neg_index
+    if consts.is_color_equal(pixel_value, (0, 0, 0), 10):
+        return -1
 
-    for pos_index in range(len(consts.positive_scale)):
-        if consts.is_color_equal(pixel_value, consts.positive_scale[pos_index], 10):
-            return pos_index
+    for idx in range(len(consts.color_velocity_pairs)):
+        if consts.is_color_equal(pixel_value, consts.color_velocity_pairs[idx][0], 10):
+            return idx
+
+    return -1
 
 
 def get_blank_list(folder_path, fill_img):
@@ -342,50 +344,31 @@ def fill_blank_enclosure(folder_path, fill_img, blank_contours):
         painted = set()
         while len(painted) < len(contour):
             for coordinate in contour:
+                # filter out painted pixel
                 if coordinate in painted:
                     continue
-                top_value = fill_img.getpixel((coordinate[0], coordinate[1] - 1))
-                if consts.is_color_equal(top_value, (0, 0, 0), 10):
-                    top_index = -100
-                else:
-                    top_index = get_color_index(top_value)
-                bottom_value = fill_img.getpixel((coordinate[0], coordinate[1] + 1))
-                if consts.is_color_equal(bottom_value, (0, 0, 0), 10):
-                    bottom_index = -100
-                else:
-                    bottom_index = get_color_index(bottom_value)
-                left_value = fill_img.getpixel((coordinate[0] - 1, coordinate[1]))
-                if consts.is_color_equal(left_value, (0, 0, 0), 10):
-                    left_index = -100
-                else:
-                    left_index = get_color_index(left_value)
-                right_value = fill_img.getpixel((coordinate[0] + 1, coordinate[1]))
-                if consts.is_color_equal(right_value, (0, 0, 0), 10):
-                    right_index = -100
-                else:
-                    right_index = get_color_index(right_value)
 
-                # calculate sum of total index
-                index_sum = top_index + bottom_index + left_index + right_index
+                # get surrounding color info
+                surrounding_indexes = []
+                surrounding_values = []
+                for offset in consts.surrounding_offsets:
+                    neighbour_value = fill_img.getpixel((coordinate[0] + offset[0], coordinate[1] + offset[1]))
+                    surrounding_values.append(neighbour_value)
+                    color_index = get_color_index(neighbour_value)
+                    # add valid index
+                    if color_index >= 0:
+                        surrounding_indexes.append(color_index)
 
                 # check whether there is more than two valid neighbour
-                if index_sum >= -212:
-                    # calculate the average index
-                    valid_sum = 0
-                    valid_num = 0
-                    indexes = [top_index, bottom_index, left_index, right_index]
-                    for index in indexes:
-                        if index > -100:
-                            valid_sum += index
-                            valid_num += 1
-
-                    average_index = valid_sum * 1.0 / valid_num
-
-                    if average_index >= 0:
-                        fill_draw.point(coordinate, consts.positive_scale[math.floor(average_index)])
+                if len(surrounding_indexes) >= 2:
+                    # check whether to execute complex filling or not
+                    if max(surrounding_indexes) - min(surrounding_indexes) < consts.complex_fill_check_threshold:
+                        average_index = sum(surrounding_indexes) * 1.0 / len(surrounding_indexes)
+                        fill_draw.point(coordinate, consts.color_velocity_pairs[math.floor(average_index)][0])
                         painted.add(coordinate)
                     else:
-                        fill_draw.point(coordinate, consts.negative_scale[math.floor(abs(average_index))])
+                        echo_value = get_complex_fill_color(fill_img, coordinate, surrounding_values)
+                        fill_draw.point(coordinate, echo_value)
                         painted.add(coordinate)
 
     return fill_img

@@ -1,7 +1,7 @@
 import time
 from PIL import Image, ImageDraw
 import os.path
-import consts
+from RadarPreprocess import consts
 '''
 this file use to read a original doppler weather radar image
 and generate images that use the dark base image

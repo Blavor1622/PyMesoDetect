@@ -17,14 +17,15 @@ color_velocity_pairs = [
     ((174, 0, 0), 17.5), ((208, 112, 0), 23.5), ((255, 0, 0), 27.5)
 ]
 
-v_base_path = './sources/blank.png'
+v_base_path = '../RadarPreprocess/sources/blank.png'
 
 radar_area = (38, 730)
 radar_center = (384, 384)
 center_diameter = 9
+surrounding_offsets = [(0, -1), (0, 1), (-1, 0), (1, 0)]
 radar_diameter = 384 - 38
 legend_area = (769, 935, 2, 570)    # (769, 2) (935, 570)
-blur_threshold = 32.0
+blur_threshold = 29.5
 area_need_filled_threshold = 45
 max_color_sale = [(0, 224, 255), (255, 0, 0)]
 narrow_fill_threshold = 36

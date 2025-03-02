@@ -1,5 +1,5 @@
 from PIL import Image, ImageDraw
-import consts
+from RadarPreprocess import consts
 import os
 import time
 
