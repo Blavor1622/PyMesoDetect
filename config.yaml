@@ -1,0 +1,47 @@
+# Configuration for Radar Detection
+
+radar_center: [300, 300]  # List of 2 integers: [x, y]
+center_diameter: 9  # Integer
+
+radar_zone: [30, 570]  # List of 2 integers: [x_min, x_max]
+zone_diameter: 270  # Integer
+
+color_velocity_pairs:  # List of color-velocity pairs
+  - - [0, 224, 255]  # RGB Color [R, G, B] (List of 3 integers)
+    - -27.5          # Velocity (Float)
+  - - [0, 128, 255]
+    - -23.5
+  - - [50, 0, 150]
+    - -17.5
+  - - [0, 251, 144]
+    - -12.5
+  - - [0, 187, 144]
+    - -7.5
+  - - [0, 143, 0]
+    - -3
+  - - [205, 192, 159]
+    - -0.5
+  - - [255, 255, 255]
+    - 0.5
+  - - [248, 135, 0]
+    - 3
+  - - [255, 207, 0]
+    - 7.5
+  - - [255, 255, 0]
+    - 12.5
+  - - [174, 0, 0]
+    - 17.5
+  - - [208, 112, 0]
+    - 23.5
+  - - [255, 0, 0]
+    - 27.5
+
+
+max_velocity_color:  # List of two colors representing min and max velocities
+  - [0, 224, 255]  # Min velocity color (RGB)
+  - [255, 0, 0]    # Max velocity color (RGB)
+
+blur_threshold: 29.5  # Float
+area_fill_threshold: 45.0  # Float
+narrow_fill_threshold: 36.0  # Float
+complex_fill_threshold: 9.0  # Float

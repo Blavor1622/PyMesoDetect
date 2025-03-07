@@ -1,2 +1,4 @@
 Pillow
 tqdm
+pyyaml
+colorama
