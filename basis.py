@@ -64,13 +64,8 @@ color_velocity_pairs:  # List of color-velocity pairs
   - - [255, 0, 0]
     - 27.5
 
-
-max_velocity_color:  # List of two colors representing min and max velocities
-  - [0, 224, 255]  # Min velocity color (RGB)
-  - [255, 0, 0]    # Max velocity color (RGB)
-
-blur_threshold: 29.5  # Float
-area_fill_threshold: 25.0  # Float
+blur_threshold: 15.5  # Float
+area_fill_threshold: 160.0  # Float
 narrow_fill_threshold: 36.0  # Float
 complex_fill_threshold: 9.0  # Float
 """
@@ -79,7 +74,7 @@ complex_fill_threshold: 9.0  # Float
     with open(yaml_path, "w") as file:
         file.write(yaml_content)
 
-    print(f"YAML file with comments written successfully at: {yaml_path}")
+    print(f"[Info] Default YAML file generated successfully at: {yaml_path}")
 
 
 def check_input_folder(folder_path, is_default=True):
@@ -144,7 +139,6 @@ def validate_config(yaml_path = CONFIG_FILE):
         "radar_zone": list,  # Expecting a list of 2 integers
         "zone_diameter": int,
         "color_velocity_pairs": list,  # List of lists containing tuples
-        "max_velocity_color": list,  # List of lists
         "blur_threshold": float,
         "area_fill_threshold": float,
         "narrow_fill_threshold": float,
@@ -181,13 +175,6 @@ def validate_config(yaml_path = CONFIG_FILE):
                             pair[1], (int, float)) for pair in value):
                         print(
                             Fore.RED + f"[Error] `{key}` should be a list of [color, velocity] pairs." + Style.RESET_ALL)
-                        return False
-
-                elif key == "max_velocity_color":
-                    if not all(
-                            isinstance(color, list) and len(color) == 3 and all(isinstance(c, int) for c in color) for
-                            color in value):
-                        print(Fore.RED + f"[Error] `{key}` should be a list of RGB color values." + Style.RESET_ALL)
                         return False
 
             elif not isinstance(value, expected_type):

@@ -4,10 +4,9 @@ import basis
 
 valid_image_extensions = {".png", ".jpg", ".jpeg", ".bmp", ".tif", ".tiff"}
 surrounding_offsets = [(0, -1), (0, 1), (-1, 0), (1, 0)]
-
-def is_color_equal(color1, color2, delta):
-    """Check if two colors are similar within a given delta."""
-    return all(abs(c1 - c2) <= delta for c1, c2 in zip(color1[:3], color2[:3]))
+need_cover_station = ["Z9755", "Z9762", "Z9763"]
+gray_value_interval = 17
+base_images_path = "base/"
 
 
 def get_half_color_bar(mode):
@@ -61,11 +60,6 @@ def get_color_bar_info(var_name):
         for cv in data["color_velocity_pairs"]:
             cv_pairs_tuple.append((tuple(cv[0]), cv[1]))
         return cv_pairs_tuple
-    elif var_name == "max_velocity_color":
-        max_colors = []
-        for color in data["max_velocity_color"]:
-            max_colors.append(tuple(color))
-        return max_colors
     else:
         print(Fore.RED + f'[Error] Invalid var_name `{var_name}` for `get_color_bar_info`.' + Style.RESET_ALL)
         return
@@ -96,7 +90,6 @@ if __name__ == '__main__':
     print("Radar Zone:", get_radar_info("radar_zone"))
     print("Zone Diameter:", get_radar_info("zone_diameter"))
     print("Color-Velocity Pairs:", get_color_bar_info("color_velocity_pairs"))
-    print("Max Velocity Color:", get_color_bar_info("max_velocity_color"))
     print("Blur Threshold:", get_threshold("blur_threshold"))
     print("Area Fill Threshold:", get_threshold("area_fill_threshold"))
     print("Narrow Fill Threshold:", get_threshold("narrow_fill_threshold"))
