@@ -1,4 +1,4 @@
-# PyDMD(Doppler Mesocyclone Detection with Python)
+# PyMesoDetect(Mesocyclone Detection with Python)
 
 ![Python Version](https://img.shields.io/badge/python-3.12%2B-blue)
 ![License](https://img.shields.io/badge/license-MIT-blue)
@@ -16,7 +16,7 @@ This project is designed for weather enthusiasts to automate the detection of me
 
 ```sh
 # Clone the repository
-git clone https://github.com/Blavor1622/doppler-mesocyclone-detection.git
+git clone https://github.com/Blavor1622/PyMesoDetect.git
 
 # Navigate into the directory
 cd doppler-mesocyclone-detection
