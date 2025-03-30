@@ -3,14 +3,16 @@ import os
 import utils
 from Preprocess import read_data
 from Preprocess import fill_blank
-from Preprocess import velocity_unfold
 from Preprocess import cover_boundary
+from Preprocess import result_visualization
+from Preprocess import denoise
+
 
 if __name__ == '__main__':
     # Set radar images folder
-    img_folder = "C:/Users/12103/Desktop/examples/Z9755/"
-    station_num = "Z9755"
-    results_folder = 'analysis_result/Z9755/'
+    img_folder = "examples/Z9754/"
+    station_num = "Z9754"
+    results_folder = 'analysis_result/Z9754/'
 
     # Generate image config
     basis.check_input_folder(img_folder)
@@ -43,8 +45,10 @@ if __name__ == '__main__':
 
         gray_img_path = read_data.read_radar_image(result_folder_path, image_path)
 
+        result_visualization.visualize_result(result_folder_path, gray_img_path, "read_result")
+
         filled_img_path = fill_blank.fill_radar_image(result_folder_path, gray_img_path)
 
-        first_unfold_path = velocity_unfold.unfold_doppler_velocity(result_folder_path, filled_img_path, 1)
+        result_visualization.visualize_result(result_folder_path, filled_img_path, "filled")
 
-        second_unfold_path = velocity_unfold.unfold_doppler_velocity(result_folder_path, first_unfold_path, 2)
+        denoise.layer_analysis(result_folder_path, filled_img_path)

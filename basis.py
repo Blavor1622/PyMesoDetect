@@ -65,9 +65,8 @@ color_velocity_pairs:  # List of color-velocity pairs
     - 27.5
 
 blur_threshold: 15.5  # Float
-area_fill_threshold: 160.0  # Float
-narrow_fill_threshold: 36.0  # Float
-complex_fill_threshold: 9.0  # Float
+area_fill_threshold: 800.0  # Float
+narrow_fill_threshold: 48.0  # Float
 """
 
     # Write the YAML content to the file
@@ -142,7 +141,6 @@ def validate_config(yaml_path = CONFIG_FILE):
         "blur_threshold": float,
         "area_fill_threshold": float,
         "narrow_fill_threshold": float,
-        "complex_fill_threshold": float
     }
 
     # Check if the file exists

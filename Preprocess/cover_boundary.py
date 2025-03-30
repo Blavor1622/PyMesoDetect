@@ -1,7 +1,6 @@
 from PIL import Image, ImageDraw
 import utils
 import os
-from Preprocess import read_data
 
 
 cover_color = (0, 0, 0)
@@ -10,6 +9,13 @@ Note that echoes are less possible to appear in same place on radar image across
 while the boundary in radar image is static with same place. Therefore, this can be used to extract the boundary
 from several radar images of same station
 """
+
+
+def is_color_equal(color1, color2, delta):
+    """Check if two colors are similar within a given delta."""
+    return all(abs(c1 - c2) <= delta for c1, c2 in zip(color1[:3], color2[:3]))
+
+
 def extract_white_boundary(input_folder, station_num, result_folder):
     """
     Extract white boundary from given radar images of same station, so that latter analysis
@@ -51,12 +57,12 @@ def extract_white_boundary(input_folder, station_num, result_folder):
 
                 # first draw all white pixel that includes the target pixels
                 if img_num == 1:
-                    if read_data.is_color_equal(pixel_value, (255, 255, 255), 5):
+                    if is_color_equal(pixel_value, (255, 255, 255), 5):
                         result_draw.point((x, y), (255, 255, 255))
                 # then remove echo pixels in each iteration after the first one
                 else:
-                    if read_data.is_color_equal(result_value, (255, 255, 255), 5):
-                        if not read_data.is_color_equal(pixel_value, (255, 255, 255), 5):
+                    if is_color_equal(result_value, (255, 255, 255), 5):
+                        if not is_color_equal(pixel_value, (255, 255, 255), 5):
                             result_draw.point((x, y), (0, 0, 0))
 
     # Check result folder path

@@ -7,11 +7,6 @@ read_result_folder = 'read_result/'
 gray_image_name = 'radar_gray.png'
 
 
-def is_color_equal(color1, color2, delta):
-    """Check if two colors are similar within a given delta."""
-    return all(abs(c1 - c2) <= delta for c1, c2 in zip(color1[:3], color2[:3]))
-
-
 def read_radar_image(folder_path, radar_img_path):
     """
     Generating a gray image from the original radar image
@@ -43,7 +38,7 @@ def read_radar_image(folder_path, radar_img_path):
 
             # Match echo color
             for idx in range(len(cv_pairs)):
-                if is_color_equal(pixel_value, cv_pairs[idx][0], 10):
+                if all(abs(c1 - c2) <= 10 for c1, c2 in zip(pixel_value[:3], cv_pairs[idx][0][:3])):
                     gray_value = (idx + 1) * utils.gray_value_interval
                     gray_draw.point((x, y), (gray_value, gray_value, gray_value))
 

@@ -2,6 +2,7 @@ from colorama import Fore, Style
 import yaml
 import basis
 
+
 valid_image_extensions = {".png", ".jpg", ".jpeg", ".bmp", ".tif", ".tiff"}
 surrounding_offsets = [(0, -1), (0, 1), (-1, 0), (1, 0)]
 need_cover_station = ["Z9755", "Z9762", "Z9763"]

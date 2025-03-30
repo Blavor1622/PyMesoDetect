@@ -55,9 +55,6 @@ def get_connected_component(refer_img, coordinate_list):
     radar_zone = utils.get_radar_info("radar_zone")
     gray_value_interval = utils.gray_value_interval
 
-    target_value = refer_img.getpixel(coordinate_list[0])[0]
-    target_index = round(1.0 * target_value / gray_value_interval) - 1
-
     components = []
     visited = set()
     for point in coordinate_list:
@@ -65,6 +62,10 @@ def get_connected_component(refer_img, coordinate_list):
             visited.add(point)
             stack = [point]
             component = [point]
+
+            # Extract gray value index of current point
+            target_value = refer_img.getpixel(point)[0]
+            target_index = round(1.0 * target_value / gray_value_interval) - 1
 
             while stack:
                 current_point = stack.pop()
@@ -188,6 +189,10 @@ def get_surrounding_echo_list(filled_img, enclosure):
     :return: a set of surrounding echoes
     """
     surrounding = set()
+    # Return empty set for empty enclosure
+    if len(enclosure) == 0:
+        return surrounding
+
     # Get basic data
     gray_value_interval = utils.gray_value_interval
     surrounding_offsets = utils.surrounding_offsets
