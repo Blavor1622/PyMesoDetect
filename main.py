@@ -1,18 +1,17 @@
 import basis
 import os
 import utils
+import time
 from Preprocess import read_data
 from Preprocess import fill_blank
 from Preprocess import cover_boundary
-from Preprocess import result_visualization
-from Preprocess import denoise
-
+from Preprocess import layer_denoise
 
 if __name__ == '__main__':
     # Set radar images folder
     img_folder = "examples/Z9754/"
     station_num = "Z9754"
-    results_folder = 'analysis_result/Z9754/'
+    results_folder = 'analysis_result_1/Z9754/'
 
     # Generate image config
     basis.check_input_folder(img_folder)
@@ -32,6 +31,7 @@ if __name__ == '__main__':
 
     # Analise each radar image
     for image_name in image_files:
+        start = time.time()
         # Generate image entire path and result folder path
         image_path = img_folder + image_name
         result_folder_path = results_folder + image_name.split(".")[0] + '/'
@@ -45,10 +45,24 @@ if __name__ == '__main__':
 
         gray_img_path = read_data.read_radar_image(result_folder_path, image_path)
 
-        result_visualization.visualize_result(result_folder_path, gray_img_path, "read_result")
+        utils.visualize_result(result_folder_path, gray_img_path, "read_result")
 
         filled_img_path = fill_blank.fill_radar_image(result_folder_path, gray_img_path)
 
-        result_visualization.visualize_result(result_folder_path, filled_img_path, "filled")
+        utils.visualize_result(result_folder_path, filled_img_path, "filled")
 
-        denoise.layer_analysis(result_folder_path, filled_img_path)
+        neg_denoise_img_path, pos_denoise_img_path, integrate_img_path, unfold_img_path\
+            = layer_denoise.layer_analysis(result_folder_path, filled_img_path)
+
+        utils.visualize_result(result_folder_path, neg_denoise_img_path, "neg_denoise")
+
+        utils.visualize_result(result_folder_path, pos_denoise_img_path, "pos_denoise")
+
+        utils.visualize_result(result_folder_path, integrate_img_path, "integrate")
+
+        utils.visualize_result(result_folder_path, unfold_img_path, "unfold")
+
+        utils.velocity_mode_division(result_folder_path, filled_img_path)
+        end = time.time()
+        duration = end - start
+        print(f"[Info] Final duration of execution: {duration:.4f} seconds")

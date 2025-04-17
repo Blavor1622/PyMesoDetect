@@ -65,7 +65,7 @@ color_velocity_pairs:  # List of color-velocity pairs
     - 27.5
 
 blur_threshold: 15.5  # Float
-area_fill_threshold: 800.0  # Float
+area_fill_threshold: 500.0  # Float
 narrow_fill_threshold: 48.0  # Float
 """
 
