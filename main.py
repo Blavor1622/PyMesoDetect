@@ -6,12 +6,16 @@ from Preprocess import read_data
 from Preprocess import fill_blank
 from Preprocess import cover_boundary
 from Preprocess import layer_denoise
+from ImmerseSimulation import peak_analysis
+from MesoDetection import meso_analysis
+
 
 if __name__ == '__main__':
     # Set radar images folder
-    img_folder = "examples/Z9754/"
+    img_folder = "/4.21潮揭中气旋_Z9754/"
     station_num = "Z9754"
-    results_folder = 'analysis_result_1/Z9754/'
+    results_folder = "analysis_result/Z9754/"
+    detect_result_folder = "detect_result/Z9754/"
 
     # Generate image config
     basis.check_input_folder(img_folder)
@@ -28,6 +32,10 @@ if __name__ == '__main__':
         print("[Info] This radar images need to cover boundaries.")
     else:
         need_cover = False
+
+    # Check result folder
+    if not os.path.exists(detect_result_folder):
+        os.makedirs(detect_result_folder)
 
     # Analise each radar image
     for image_name in image_files:
@@ -63,6 +71,13 @@ if __name__ == '__main__':
         utils.visualize_result(result_folder_path, unfold_img_path, "unfold")
 
         utils.velocity_mode_division(result_folder_path, filled_img_path)
+
+        neg_peaks, pos_peaks = peak_analysis.immerse_analysis(result_folder_path, unfold_img_path)
+
+        meso_detect_result_img = meso_analysis.meso_detect(result_folder_path, unfold_img_path, neg_peaks, pos_peaks)
+
+        meso_detect_result_img.save(detect_result_folder + "DMD_" + image_name.split(".")[0] + ".png")
+
         end = time.time()
         duration = end - start
         print(f"[Info] Final duration of execution: {duration:.4f} seconds")

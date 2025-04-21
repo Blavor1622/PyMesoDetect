@@ -38,8 +38,8 @@ denoise:
 
 analysis_folder = "layer_fill/"
 debug_folder = "layer_debug/"
-group_size_threshold = 16
-layer_gap_threshold = 2.95
+group_size_threshold = 15
+layer_gap_threshold = 2.2
 unfold_gap_threshold = 6.5
 surrounded_fill_threshold = 0.9
 folded_echo_layer_num = 2
