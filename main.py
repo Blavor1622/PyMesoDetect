@@ -5,17 +5,17 @@ import time
 from Preprocess import read_data
 from Preprocess import fill_blank
 from Preprocess import cover_boundary
-from Preprocess import layer_denoise
+from Preprocess.RadarDenoise import denoise
 from ImmerseSimulation import peak_analysis
 from MesoDetection import meso_analysis
 
 
 if __name__ == '__main__':
     # Set radar images folder
-    img_folder = "/4.21潮揭中气旋_Z9754/"
-    station_num = "Z9754"
-    results_folder = "analysis_result/Z9754/"
-    detect_result_folder = "detect_result/Z9754/"
+    img_folder = "C:/Users/12103/Desktop/4.22四会中气旋/"
+    station_num = "Z9200"
+    results_folder = "results/analysis_result/Z9200/"
+    detect_result_folder = "results/detect_result/Z9200/"
 
     # Generate image config
     basis.check_input_folder(img_folder)
@@ -60,7 +60,7 @@ if __name__ == '__main__':
         utils.visualize_result(result_folder_path, filled_img_path, "filled")
 
         neg_denoise_img_path, pos_denoise_img_path, integrate_img_path, unfold_img_path\
-            = layer_denoise.layer_analysis(result_folder_path, filled_img_path)
+            = denoise.radar_denoise(result_folder_path, filled_img_path)
 
         utils.visualize_result(result_folder_path, neg_denoise_img_path, "neg_denoise")
 

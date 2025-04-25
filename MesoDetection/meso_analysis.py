@@ -10,6 +10,7 @@ analysis_debug_folder = "debug/"
 
 CENTER_DIAMETER = 4
 CENTER_DISTANCE_THRESHOLD = 24 # (183 - 65) pixels/ 50 km = 2.36 pixel per kilometer
+MESO_ROTATION_THRESHOLD = 9.5 # m/s, threshold for the rotation speed of meso
 
 
 def meso_detect(folder_path, unfold_img_path, neg_peaks, pos_peaks):
@@ -37,12 +38,37 @@ def meso_detect(folder_path, unfold_img_path, neg_peaks, pos_peaks):
         pos_centers.append(center)
 
     meso_pairs = []
-    for neg_center in neg_centers:
-        for pos_center in pos_centers:
-            # Calculate distance
+    cv_pairs = utils.get_color_bar_info("color_velocity_pairs")
+    for neg_idx in range(len(neg_centers)):
+        for pos_idx in range(len(pos_centers)):
+            neg_center = neg_centers[neg_idx]
+            pos_center = pos_centers[pos_idx]
             center_distance = math.sqrt((neg_center[0] - pos_center[0]) ** 2 + (neg_center[1] - pos_center[1]) ** 2)
             if center_distance <= CENTER_DISTANCE_THRESHOLD:
-                meso_pairs.append((neg_center, pos_center, center_distance))
+                # Iterate through each peak and get maximum velocity value
+                maximum_neg_velocity = 0
+                for coord in neg_peaks[neg_idx]:
+                    neg_peak_echo_value = unfold_img.getpixel(coord)
+                    neg_peak_echo_index = round(neg_peak_echo_value[0] / gray_value_interval) - 1
+                    if neg_peak_echo_index in range(len(cv_pairs)):
+                        neg_peak_echo_velocity = cv_pairs[neg_peak_echo_index][1]
+                    else:
+                        continue
+                    if neg_peak_echo_velocity < maximum_neg_velocity:
+                        maximum_neg_velocity = neg_peak_echo_velocity
+                maximum_pos_velocity = 0
+                for coord in pos_peaks[pos_idx]:
+                    pos_peak_echo_value = unfold_img.getpixel(coord)
+                    pos_peak_echo_index = round(pos_peak_echo_value[0] / gray_value_interval) - 1
+                    if pos_peak_echo_index in range(len(cv_pairs)):
+                        pos_peak_echo_velocity = cv_pairs[pos_peak_echo_index][1]
+                    else:
+                        continue
+                    if pos_peak_echo_velocity > maximum_pos_velocity:
+                        maximum_pos_velocity = pos_peak_echo_velocity
+                avg_rotation = (abs(maximum_neg_velocity) + abs(maximum_pos_velocity)) / 2
+                if avg_rotation >= MESO_ROTATION_THRESHOLD:
+                    meso_pairs.append((neg_center, pos_center, center_distance))
 
     # Meso detection debug image
     meso_debug_img = Image.new("RGB", unfold_img.size, (0, 0, 0))
