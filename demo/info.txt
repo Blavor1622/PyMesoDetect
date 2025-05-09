@@ -1,0 +1,2 @@
+this folder provide script to demonstrate the usage of interfaces that provided
+by MesoDetect module

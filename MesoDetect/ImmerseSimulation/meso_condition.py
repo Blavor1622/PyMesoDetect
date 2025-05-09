@@ -1,15 +1,15 @@
 import numpy as np
 from sklearn.decomposition import PCA
-from utils import gray_value_interval
-from utils import surrounding_offsets
+from MesoDetect.ReadData.utils import gray_value_interval
+from MesoDetect.ReadData.utils import surrounding_offsets
 """
 Definition of thresholds: area, narrow degree, average volume and density degree
 """
 AREA_MINIMUM_THRESHOLD = 10
 AREA_MAXIMUM_THRESHOLD = 135
-NARROW_MAXIMUM_THRESHOLD = 3.85
+NARROW_MAXIMUM_THRESHOLD = 4.25
 AVG_VOLUME_MINIMUM_THRESHOLD = 2.25
-DENSITY_MAXIMUM_THRESHOLD = 40
+DENSITY_MAXIMUM_THRESHOLD = 75
 LAYER_GROUP_MAXIMUM_THRESHOLD = 1.75
 
 neighbour_offsets = [(0, -1), (0, 1), (-1, 0), (1, 0), (-1, -1), (-1, 1), (1, -1), (1, 1)]

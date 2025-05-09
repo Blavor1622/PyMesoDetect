@@ -1,15 +1,31 @@
 from PIL import Image
 import math
-import os
-import yaml
 from colorama import Fore, Style
-import utils
+import yaml
+import os
+from MesoDetect.DataIO.consts import CONFIG_FILE, VALID_IMG_EXTENSION
 
 
-CONFIG_FILE = "radar_basis.yaml"
+""" this is interface for radar image configration data setting up """
+def setup_radar_img_config(data_path: str, is_folder: bool = False, enable_default_config: bool = True):
+    # Check given data path is a folder or single image
+    sample_img_path = data_path
+    if is_folder:
+        # Check folder data
+        sample_img_path = check_input_folder(data_path)
+
+    # From parameter decide whether to update default image config data or not
+    if enable_default_config:
+        write_default_config(sample_img_path)
+
+    # Validate config file
+    validate_radar_config()
 
 
-def write_yaml_with_comments(sample_img_path, yaml_path = CONFIG_FILE):
+"""
+    The following functions is internal dependency logic function
+"""
+def write_default_config(sample_img_path, yaml_path = CONFIG_FILE):
     """
     Writes a YAML configuration file with comments explaining each variable.
 
@@ -76,7 +92,7 @@ narrow_fill_threshold: 48.0  # Float
     print(f"[Info] Default YAML file generated successfully at: {yaml_path}")
 
 
-def check_input_folder(folder_path, is_default=True):
+def check_input_folder(folder_path):
     """
     Checks if the specified folder path exists and contains valid radar image files.
     If the folder does not exist or contains no valid image files, an error message is printed.
@@ -84,7 +100,6 @@ def check_input_folder(folder_path, is_default=True):
 
     Parameters:
         folder_path (str): The path to the folder containing radar images.
-        is_default (bool, optional): Whether to use the first valid image to write default data. Defaults to True.
 
     Returns:
         None
@@ -99,17 +114,15 @@ def check_input_folder(folder_path, is_default=True):
         all_files = os.listdir(folder_path)
 
         # Filter valid image files
-        image_files = [file for file in all_files if os.path.splitext(file)[1].lower() in utils.valid_image_extensions]
+        image_files = [file for file in all_files if os.path.splitext(file)[1].lower() in VALID_IMG_EXTENSION]
 
         if not image_files:
             raise ValueError(f"No valid image files found in folder: {folder_path}.")
 
-        if is_default:
-            # Construct the full path of the first valid image file
-            sample_image_path = os.path.join(folder_path, image_files[0])
+        # Get a sample image path from input folder
+        sample_image_path = os.path.join(folder_path, image_files[0])
 
-            # Call function to write default data
-            write_yaml_with_comments(sample_image_path)
+        return sample_image_path
 
     except FileNotFoundError as e:
         print(Fore.RED + f"[Error] {e}" + Style.RESET_ALL)
@@ -119,7 +132,7 @@ def check_input_folder(folder_path, is_default=True):
         print(Fore.RED + f"[Unexpected Error] {e}" + Style.RESET_ALL)
 
 
-def validate_config(yaml_path = CONFIG_FILE):
+def validate_radar_config(yaml_path = CONFIG_FILE):
     """
     Validates a YAML file by ensuring all required keys exist and their values match the expected data types.
 
@@ -186,3 +199,101 @@ def validate_config(yaml_path = CONFIG_FILE):
     except yaml.YAMLError as e:
         print(Fore.RED + f"[Error] Invalid YAML syntax: {e}" + Style.RESET_ALL)
         return False
+
+
+"""
+    The following functions is for internal script reading radar config data
+"""
+
+def get_half_color_bar(mode):
+    # Load YAML file
+    with open(CONFIG_FILE, "r") as file:
+        data = yaml.safe_load(file)
+
+    half_len = int(len(data["color_velocity_pairs"]) / 2)
+    if mode == 'neg':
+        neg_color_scales = []
+        for idx in range(half_len - 1, -1, -1):
+            neg_color_scales.append(tuple(data["color_velocity_pairs"][idx][0]))
+        return neg_color_scales
+    elif mode == 'pos':
+        pos_color_scales = []
+        for idx in range(half_len, len(data["color_velocity_pairs"])):
+            pos_color_scales.append(tuple(data["color_velocity_pairs"][idx][0]))
+        return pos_color_scales
+    else:
+        print(Fore.RED + f"[Error] Invalid mode code: `{mode}` for `get_half_color_bar`." + Style.RESET_ALL)
+        return
+
+
+def get_radar_info(var_name):
+    # Load YAML file
+    with open(CONFIG_FILE, "r") as file:
+        data = yaml.safe_load(file)
+
+    if var_name == "image_size":
+        return tuple(data["image_size"])
+    elif var_name == "radar_zone":
+        return data["radar_zone"]
+    elif var_name == "radar_center":
+        return data["radar_center"]
+    elif var_name == "center_diameter":
+        return data["center_diameter"]
+    elif var_name == "zone_diameter":
+        return data["zone_diameter"]
+    else:
+        print(Fore.RED + f'[Error] Invalid var_name `{var_name}` for `get_radar_info`.' + Style.RESET_ALL)
+        return
+
+
+def get_color_bar_info(var_name):
+    # Load YAML file
+    with open(CONFIG_FILE, "r") as file:
+        data = yaml.safe_load(file)
+
+    if var_name == "color_velocity_pairs":
+        cv_pairs_tuple = []
+        for cv in data["color_velocity_pairs"]:
+            cv_pairs_tuple.append((tuple(cv[0]), cv[1]))
+        return cv_pairs_tuple
+    else:
+        print(Fore.RED + f'[Error] Invalid var_name `{var_name}` for `get_color_bar_info`.' + Style.RESET_ALL)
+        return
+
+
+def get_threshold(var_name):
+    # Load YAML file
+    with open(CONFIG_FILE, "r") as file:
+        data = yaml.safe_load(file)
+
+    if var_name == "blur_threshold":
+        return data["blur_threshold"]
+    elif var_name == "area_fill_threshold":
+        return data["area_fill_threshold"]
+    elif var_name == "narrow_fill_threshold":
+        return data["narrow_fill_threshold"]
+    elif var_name == "complex_fill_threshold":
+        return data["complex_fill_threshold"]
+    else:
+        print(Fore.RED + f'[Error] Invalid var_name `{var_name}` for `get_threshold`.' + Style.RESET_ALL)
+        return
+
+
+"""
+    config data reading usage demonstration
+"""
+# if __name__ == '__main__':
+#     # Print values to verify
+#     print("Radar size:", get_radar_info("image_size"))
+#     print("Radar Center:", get_radar_info("radar_center"))
+#     print("Center Diameter:", get_radar_info("center_diameter"))
+#     print("Radar Zone:", get_radar_info("radar_zone"))
+#     print("Zone Diameter:", get_radar_info("zone_diameter"))
+#     print("Color-Velocity Pairs:", get_color_bar_info("color_velocity_pairs"))
+#     print("Blur Threshold:", get_threshold("blur_threshold"))
+#     print("Area Fill Threshold:", get_threshold("area_fill_threshold"))
+#     print("Narrow Fill Threshold:", get_threshold("narrow_fill_threshold"))
+#
+#     print("neg_color_scales: ",get_half_color_bar("neg"))
+#     print("pos_color_scales: ",get_half_color_bar("pos"))
+

@@ -1,14 +1,13 @@
 from PIL import Image, ImageDraw
 import os
-import utils
+from MesoDetect.ReadData import utils
 import time
 import copy
 
-
-from ImmerseSimulation import meso_condition
-from ImmerseSimulation.meso_condition import AREA_MAXIMUM_THRESHOLD
-from utils import gray_value_interval
-from utils import surrounding_offsets
+from MesoDetect.ImmerseSimulation import meso_condition
+from MesoDetect.ImmerseSimulation.meso_condition import AREA_MAXIMUM_THRESHOLD
+from MesoDetect.ReadData.utils import surrounding_offsets
+from MesoDetect.ReadData.utils import gray_value_interval
 analysis_result_folder = "peak_analysis/"
 analysis_debug_folder = analysis_result_folder + "debug/"
 
@@ -44,6 +43,29 @@ def immerse_analysis(folder_path, preprocessed_img_path):
 
     pos_peak_groups = get_regional_peaks(layer_model, preprocessed_img.size, "pos", debug_folder_path)
 
+    # Draw tow mode peak groups debug image
+    radar_img_size = utils.get_radar_info("image_size")
+    cv_pairs = utils.get_color_bar_info("color_velocity_pairs")
+    peak_integrate_img = Image.new("RGB", radar_img_size, (0, 0, 0))
+    peak_integrate_draw = ImageDraw.Draw(peak_integrate_img)
+
+    for neg_peak_group in neg_peak_groups:
+        for coord in neg_peak_group:
+            # Get pixel value
+            pixel_value = preprocessed_img.getpixel(coord)
+            pixel_value_index = round(pixel_value[0] / gray_value_interval) - 1
+            if pixel_value_index in range(len(cv_pairs)):
+                peak_integrate_draw.point(coord, cv_pairs[pixel_value_index][0])
+
+    for pos_peak_group in pos_peak_groups:
+        for coord in pos_peak_group:
+            # Get pixel value
+            pixel_value = preprocessed_img.getpixel(coord)
+            pixel_value_index = round(pixel_value[0] / gray_value_interval) - 1
+            if pixel_value_index in range(len(cv_pairs)):
+                peak_integrate_draw.point(coord, cv_pairs[pixel_value_index][0])
+
+    peak_integrate_img.save(debug_folder_path + "peak_integration.png")
     end = time.time()
     duration = end - start
     print(f"[Info] Duration of immerse analysis: {duration:.4f} seconds.")

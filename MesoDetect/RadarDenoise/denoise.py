@@ -1,11 +1,7 @@
 from PIL import Image
 import os
 import time
-from Preprocess.RadarDenoise import dependencies
-from Preprocess.RadarDenoise import layer_analysis
-from Preprocess.RadarDenoise import velocity_unfold
-from Preprocess.RadarDenoise import velocity_integrate
-
+from MesoDetect.Preprocess.RadarDenoise import layer_analysis, dependencies, velocity_integrate, velocity_unfold
 
 analysis_folder = "layer_denoise/"
 debug_folder = "layer_debug/"

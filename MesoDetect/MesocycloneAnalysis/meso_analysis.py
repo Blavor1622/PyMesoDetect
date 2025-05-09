@@ -1,7 +1,7 @@
 from PIL import Image, ImageDraw
 import os
-import utils
-from utils import gray_value_interval
+from MesoDetect.ReadData import utils
+from MesoDetect.ReadData.utils import gray_value_interval
 import math
 import time
 
@@ -11,7 +11,7 @@ analysis_debug_folder = "debug/"
 CENTER_DIAMETER = 4
 CENTER_DISTANCE_THRESHOLD = 24 # (183 - 65) pixels/ 50 km = 2.36 pixel per kilometer
 MESO_ROTATION_THRESHOLD = 9.5 # m/s, threshold for the rotation speed of meso
-
+VALID_MESO_ECHO_RATIO_THRESHOLD = 0.89 # threshold for checking invalid echo ratio in the meso range
 
 def meso_detect(folder_path, unfold_img_path, neg_peaks, pos_peaks):
     start = time.time()
@@ -37,6 +37,7 @@ def meso_detect(folder_path, unfold_img_path, neg_peaks, pos_peaks):
         center = get_group_center(unfold_img, group)
         pos_centers.append(center)
 
+    # Meso Data Structure containing neg, pos center coordinate and float type center distance
     meso_pairs = []
     cv_pairs = utils.get_color_bar_info("color_velocity_pairs")
     for neg_idx in range(len(neg_centers)):
@@ -95,6 +96,9 @@ def meso_detect(folder_path, unfold_img_path, neg_peaks, pos_peaks):
     # Save debug result image
     meso_debug_img.save(analysis_debug_folder_path + "meso_detect.png")
 
+    # Filter out fake meso
+    meso_pairs = filter_fake_meso(unfold_img, meso_pairs)
+
     # Generate a detection result image
     cv_pairs = utils.get_color_bar_info("color_velocity_pairs")
     meso_result_img = Image.new("RGB", unfold_img.size, (0, 0, 0))
@@ -146,3 +150,43 @@ def get_group_center(refer_img, echo_group):
     center_y = round(center_y_sum / weight_sum)
     center = (center_x, center_y)
     return center
+
+
+def filter_fake_meso(unfold_img, meso_pairs):
+    filtered_meso_pairs = []
+    for meso_pair in meso_pairs:
+        # Get meso center
+        neg_center = meso_pair[0]
+        pos_center = meso_pair[1]
+        mid_center_x = round((neg_center[0] + pos_center[0]) / 2)
+        mid_center_y = round((neg_center[1] + pos_center[1]) / 2)
+        # Get meso diameter
+        range_radius = round(meso_pair[2])
+        # Iterate meso range to calculate empty and basemaps echo ratio
+        # Note that the valid echoes do not include basemaps filled echoes
+        invalid_echo_num = 0
+        total_in_range_pixel_num = 0
+        for x in range(mid_center_x - range_radius, mid_center_x + range_radius):
+            for y in range(mid_center_y - range_radius, mid_center_y + range_radius):
+                if not math.sqrt((x - mid_center_x) ** 2 + (y - mid_center_y) ** 2) <= range_radius:
+                    # Skip coordinate that out of range
+                    continue
+                total_in_range_pixel_num += 1
+                # Get pixel value
+                pixel_value = unfold_img.getpixel((x, y))
+                # Calculate gray value index, use second channel RGB value
+                pixel_value_index = round(pixel_value[1] / gray_value_interval) - 1
+                if pixel_value_index == -1:
+                    invalid_echo_num += 1
+        if total_in_range_pixel_num > 0:
+            invalid_echo_ratio = invalid_echo_num / total_in_range_pixel_num
+        else:
+            invalid_echo_ratio = 1
+        # Check with threshold
+        if invalid_echo_ratio <= 1 - VALID_MESO_ECHO_RATIO_THRESHOLD:
+            filtered_meso_pairs.append(meso_pair)
+    return filtered_meso_pairs
+
+
+
+

@@ -1,5 +1,5 @@
-from PIL import Image, ImageDraw
-import utils
+from PIL import Image
+from MesoDetect.ReadData import utils
 import numpy as np
 from skimage.segmentation import flood_fill
 

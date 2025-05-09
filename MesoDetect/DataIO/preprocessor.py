@@ -1,28 +1,122 @@
 from PIL import Image, ImageDraw
 import os
-from tqdm import tqdm
-import utils
 import time
+from tqdm import tqdm
 import random
+from MesoDetect.DataIO.consts import (NEED_COVER_BOUNDARY_STATIONS, BASEMAP_IMG_PATH,
+                                      GRAY_SCALE_UNIT, NARROW_SURROUNDING_OFFSETS)
+from MesoDetect.DataIO import radar_config
 
-filled_result_folder = "fill_blank/"
-filled_result_name = "gray_filled.png"
-narrow_fill_debug_folder = "narrow_fill_debug/"
+CURRENT_DEBUG_RESULT_FOLDER = "DataIO/"
 
 
-def narrow_fill(folder_path, gray_img_path):
-    print("  [1] Start narrow filling...")
-    # Open gray radar image
-    gray_img = Image.open(gray_img_path)
+"""
+Note that echoes are less possible to appear in same place on radar image across a wide range of time,
+while the boundary in radar image is static with same place. Therefore, this can be used to extract the boundary
+from several radar images of same station
+"""
+
+
+def get_gray_img(img_path: str, station_num: str, enable_debug: bool = False, image_debug_folder_path: str = ""):
+    """
+    Generate a gray image from original radar image as internal representation
+    as result of preprocessing, including boundary covering, radar echo extraction, and narrow filling.
+    :param img_path: path of original radar image
+    :param station_num: station number of radar image in string type
+    :param enable_debug: boolean flag for deciding whether to enable debug mode or not
+    :param image_debug_folder_path: path of debug result folder in string type
+    :return: PIL image object of gray image
+    """
+    # Check debug result folder if enable debug mode
+    if enable_debug and image_debug_folder_path == "":
+        print("Error")
+        return
+
+    # Read radar data
+    read_result_img = read_radar_image(img_path, station_num, enable_debug, image_debug_folder_path)
+
+    # Fill radar data
+    filled_img = narrow_fill(read_result_img, enable_debug, image_debug_folder_path)
+
+    return filled_img
+
+
+def read_radar_image(radar_img_path, station_num: str, enable_debug: bool = False, image_debug_folder_path: str = "") -> Image:
+    """
+    Generating a gray image from the original radar image
+    so that later process can basemaps on this gray image
+    :param radar_img_path: path of original radar image
+    :param station_num: string value of the original radar station number with format "Zxxxx"
+    :param enable_debug: boolean flag for deciding whether to enable debug mode
+    :param image_debug_folder_path: path of debug result folder for each radar image
+    :return: path of gray image if generation is success
+    """
+    start = time.time()
+    print("[Info] Start processing radar data...")
+    # Check debug result folder existence
+    # Initialize empty folder path
+    current_debug_folder_path = ""
+    if enable_debug and image_debug_folder_path != "":
+        current_debug_folder_path = image_debug_folder_path + CURRENT_DEBUG_RESULT_FOLDER
+        if not os.path.exists(current_debug_folder_path):
+            os.makedirs(current_debug_folder_path)
+
+    # Open radar image
+    radar_img = Image.open(radar_img_path)
+
+    # Check whether current radar image need boundary coverage
+    if station_num in NEED_COVER_BOUNDARY_STATIONS:
+        coverage_draw = ImageDraw.Draw(radar_img)
+        base_img = Image.open(BASEMAP_IMG_PATH + "white_boundary_" + station_num + ".png")
+
+        # Iterate the whole zone of radar image that might covered by the white boundary
+        for x in range(0, base_img.size[1]):
+            for y in range(0, base_img.size[1]):
+                base_pixel_value = base_img.getpixel((x, y))
+                if base_pixel_value[0] > 245:
+                    coverage_draw.point((x, y), (0, 0, 0))
+
+        # Debug process
+        if enable_debug and current_debug_folder_path != "":
+            coverage_debug_img_path = current_debug_folder_path + "boundary_coverage.png"
+            radar_img.save(coverage_debug_img_path)
+
+    # Result images
+    gray_img = Image.new("RGB", radar_img.size, (0, 0, 0))
+    gray_draw = ImageDraw.Draw(gray_img)
+
+    # Iterate the radar zone to read echo data
+    radar_zone = radar_config.get_radar_info("radar_zone")
+    cv_pairs = radar_config.get_color_bar_info("color_velocity_pairs")
+    for x in range(radar_zone[0], radar_zone[1]):
+        for y in range(radar_zone[0], radar_zone[1]):
+            # Get current pixel value
+            pixel_value = radar_img.getpixel((x, y))
+
+            # Match echo color
+            for idx in range(len(cv_pairs)):
+                if all(abs(c1 - c2) <= 10 for c1, c2 in zip(pixel_value[:3], cv_pairs[idx][0][:3])):
+                    gray_value = (idx + 1) * GRAY_SCALE_UNIT
+                    gray_draw.point((x, y), (gray_value, gray_value, gray_value))
+
+    if enable_debug and current_debug_folder_path != "":
+        read_result_path = current_debug_folder_path + "original_read.png"
+        gray_img.save(read_result_path)
+
+    end = time.time()
+    duration = end - start
+    print(f'[Info] duration of radar reading: {duration:.4f} seconds')
+    return gray_img
+
+
+def narrow_fill(gray_img: Image, enable_debug: bool = False, image_debug_folder_path: str = "") -> Image:
+    start = time.time()
+    print("[Info] Start filling radar image...")
 
     # Create result path
-    filled_img = Image.open(gray_img_path)
+    filled_img = gray_img.copy()
     filled_draw = ImageDraw.Draw(filled_img)
 
-    # Debug image
-    # Check debug result folder
-    if not os.path.exists(folder_path + filled_result_folder + narrow_fill_debug_folder):
-        os.makedirs(folder_path + filled_result_folder + narrow_fill_debug_folder)
     simple_fill_img = Image.new("RGB", filled_img.size, (0, 0, 0))
     complex_fill_img = Image.new("RGB", filled_img.size, (0, 0, 0))
     only_filled_img = Image.new("RGB", filled_img.size, (0, 0, 0))
@@ -32,10 +126,9 @@ def narrow_fill(folder_path, gray_img_path):
     only_fill_draw = ImageDraw.Draw(only_filled_img)
 
     # Get const values
-    radar_zone = utils.get_radar_info("radar_zone")
-    surrounding_offsets = utils.surrounding_offsets
-    align_const = (1 + len(utils.get_color_bar_info("color_velocity_pairs"))) * 1.0 / 2
-    gray_value_interval = utils.gray_value_interval
+    radar_zone = radar_config.get_radar_info("radar_zone")
+    align_const = (1 + len(radar_config.get_color_bar_info("color_velocity_pairs"))) * 1.0 / 2
+    gray_value_interval = GRAY_SCALE_UNIT
 
     # Iterate radar zone
     total_iterations = (radar_zone[1] - radar_zone[0]) ** 2
@@ -52,7 +145,7 @@ def narrow_fill(folder_path, gray_img_path):
                     continue
                 # Get surrounding pixel color value info
                 surrounding_indexes = []
-                for offset in surrounding_offsets:
+                for offset in NARROW_SURROUNDING_OFFSETS:
                     neighbour_value = gray_img.getpixel((x + offset[0], y + offset[1]))
                     surrounding_index = round(neighbour_value[0] * 1.0 / gray_value_interval) - 1
                     surrounding_indexes.append(surrounding_index)
@@ -87,7 +180,7 @@ def narrow_fill(folder_path, gray_img_path):
                     # Indicate that color value indexes are next to each other
                     # Use first average then round to get fill color value index
                     average_index = round((sum(valid_indexes) * 1.0) / len(valid_indexes))
-                    # Calculate gray value base on the index value
+                    # Calculate gray value basemaps on the index value
                     gray_value = (average_index + 1) * gray_value_interval
                     # Compose gray RGB color
                     gray_color = (gray_value, gray_value, gray_value)
@@ -118,7 +211,7 @@ def narrow_fill(folder_path, gray_img_path):
                     random_align_index = random.choice(minimum_aligned_indexes)
                     # Restore gray index value from aligned index value
                     final_value_index = round(random_align_index + align_const - 1)
-                    # Calculate gray value base on the gray index value
+                    # Calculate gray value basemaps on the gray index value
                     gray_value = (final_value_index + 1) * gray_value_interval
                     # Compose RGB color
                     gray_color = (gray_value, gray_value, gray_value)
@@ -130,41 +223,16 @@ def narrow_fill(folder_path, gray_img_path):
                 # Update bar process
                 pbar.update(1)
 
-    # Save filled image
-    filled_img_path = folder_path + filled_result_folder + filled_result_name
-    filled_img.save(filled_img_path)
 
-    # Save debug image
-    simple_fill_img.save(folder_path + filled_result_folder + narrow_fill_debug_folder + "simple_fill.png")
-    complex_fill_img.save(folder_path + filled_result_folder + narrow_fill_debug_folder + "complex_fill.png")
-    only_filled_img.save(folder_path + filled_result_folder + narrow_fill_debug_folder + "only_fill.png")
-
-    print("  [1] Narrow filling finished.")
-    return filled_img_path
-
-
-def fill_radar_image(folder_path, gray_img_path):
-    """
-    Filling blanks in the radar image that covered by boundaries, range ring and place name mark,
-    Generating a filled image that keep the consistency of same value echoed groups as possible
-    for latter analysis
-    :param gray_img_path: path of gray image that generated by read_data.py module
-    :param folder_path: path of result folder
-    :return: path of filled image
-    """
-    start = time.time()
-    print("[Info] Start filling radar image...")
-    # Check result path
-    if not os.path.exists(folder_path + filled_result_folder):
-        os.makedirs(folder_path + filled_result_folder)
-
-    # Execute narrow filling
-    narrow_filled_path = narrow_fill(folder_path, gray_img_path)
-
+    if enable_debug and image_debug_folder_path != "":
+        current_debug_folder_path = image_debug_folder_path + CURRENT_DEBUG_RESULT_FOLDER
+        if not os.path.exists(current_debug_folder_path):
+            os.makedirs(current_debug_folder_path)
+        simple_fill_img.save(current_debug_folder_path + "simple_filled.png")
+        complex_fill_img.save(current_debug_folder_path + "complex_filled.png")
+        only_filled_img.save(current_debug_folder_path + "only_filled.png")
+        filled_img.save(current_debug_folder_path + "filled.png")
     end = time.time()
     duration = end - start
     print(f"[Info] Duration of radar filling: {duration:.4f} seconds")
-
-    # Return filled image path
-    return narrow_filled_path
-
+    return filled_img
