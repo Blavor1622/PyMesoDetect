@@ -1,7 +1,8 @@
 from PIL import Image
-from MesoDetect.ReadData import utils
 import numpy as np
 from skimage.segmentation import flood_fill
+from MesoDetect.DataIO.radar_config import get_radar_info, get_color_bar_info
+from MesoDetect.DataIO.consts import GRAY_SCALE_UNIT, SURROUNDING_OFFSETS
 
 
 """
@@ -15,9 +16,9 @@ def get_layer_model(filled_img):
     :return: layer model
     """
     # Get dependency data
-    radar_zone = utils.get_radar_info("radar_zone")
-    cv_pairs = utils.get_color_bar_info("color_velocity_pairs")
-    gray_value_interval = utils.gray_value_interval
+    radar_zone = get_radar_info("radar_zone")
+    cv_pairs = get_color_bar_info("color_velocity_pairs")
+    gray_value_interval = GRAY_SCALE_UNIT
 
     # Construct empty data structure
     layer_model = []
@@ -48,11 +49,11 @@ def get_echo_groups(refer_img, coordinate_list):
     if len(coordinate_list) == 0:
         return [[]]
     # get neighbour coordinate offset
-    neighbour_offsets = utils.surrounding_offsets
+    neighbour_offsets = SURROUNDING_OFFSETS
 
     # Get radar zone
-    radar_zone = utils.get_radar_info("radar_zone")
-    gray_value_interval = utils.gray_value_interval
+    radar_zone = get_radar_info("radar_zone")
+    gray_value_interval = GRAY_SCALE_UNIT
 
     # Extract gray value index of current point
     target_value = refer_img.getpixel(coordinate_list[0])[0]
@@ -101,8 +102,8 @@ def inner_filling(refer_img, fill_color, fill_img):
         print(f"[Error] Invalid fill color: {fill_color} for `inner_filling`.")
         return
     # Get basic data
-    gray_value_interval = utils.gray_value_interval
-    radar_zone = utils.get_radar_info("radar_zone")
+    gray_value_interval = GRAY_SCALE_UNIT
+    radar_zone = get_radar_info("radar_zone")
 
     # Convert RGB Image into gray image numpy array
     gray_img_arr = np.array(refer_img.convert("L"))

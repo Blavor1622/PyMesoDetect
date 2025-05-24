@@ -1,7 +1,7 @@
 from PIL import Image
 import os
 import time
-from MesoDetect.Preprocess.RadarDenoise import layer_analysis, dependencies, velocity_integrate, velocity_unfold
+from MesoDetect.RadarDenoise import layer_analysis, dependencies, velocity_integrate, velocity_unfold
 
 analysis_folder = "layer_denoise/"
 debug_folder = "layer_debug/"
@@ -18,10 +18,12 @@ def radar_denoise(folder_path, narrow_filled_path):
     Returns: path of analysis result image with string format
 
     """
+
     start = time.time()
     print("[Info] Start layer filling analysis...")
     # Check result folder
     analysis_result_folder = folder_path + analysis_folder
+
     if not os.path.exists(analysis_result_folder):
         os.makedirs(analysis_result_folder)
     analysis_debug_folder = analysis_result_folder + debug_folder

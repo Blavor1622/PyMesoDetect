@@ -1,13 +1,11 @@
 from PIL import Image, ImageDraw
 import os
-from MesoDetect.ReadData import utils
 import time
 import copy
-
+from MesoDetect.DataIO.consts import GRAY_SCALE_UNIT, SURROUNDING_OFFSETS
+from MesoDetect.DataIO.radar_config import get_color_bar_info, get_radar_info
 from MesoDetect.ImmerseSimulation import meso_condition
 from MesoDetect.ImmerseSimulation.meso_condition import AREA_MAXIMUM_THRESHOLD
-from MesoDetect.ReadData.utils import surrounding_offsets
-from MesoDetect.ReadData.utils import gray_value_interval
 analysis_result_folder = "peak_analysis/"
 analysis_debug_folder = analysis_result_folder + "debug/"
 
@@ -44,8 +42,8 @@ def immerse_analysis(folder_path, preprocessed_img_path):
     pos_peak_groups = get_regional_peaks(layer_model, preprocessed_img.size, "pos", debug_folder_path)
 
     # Draw tow mode peak groups debug image
-    radar_img_size = utils.get_radar_info("image_size")
-    cv_pairs = utils.get_color_bar_info("color_velocity_pairs")
+    radar_img_size = get_radar_info("image_size")
+    cv_pairs = get_color_bar_info("color_velocity_pairs")
     peak_integrate_img = Image.new("RGB", radar_img_size, (0, 0, 0))
     peak_integrate_draw = ImageDraw.Draw(peak_integrate_img)
 
@@ -53,7 +51,7 @@ def immerse_analysis(folder_path, preprocessed_img_path):
         for coord in neg_peak_group:
             # Get pixel value
             pixel_value = preprocessed_img.getpixel(coord)
-            pixel_value_index = round(pixel_value[0] / gray_value_interval) - 1
+            pixel_value_index = round(pixel_value[0] / GRAY_SCALE_UNIT) - 1
             if pixel_value_index in range(len(cv_pairs)):
                 peak_integrate_draw.point(coord, cv_pairs[pixel_value_index][0])
 
@@ -61,7 +59,7 @@ def immerse_analysis(folder_path, preprocessed_img_path):
         for coord in pos_peak_group:
             # Get pixel value
             pixel_value = preprocessed_img.getpixel(coord)
-            pixel_value_index = round(pixel_value[0] / gray_value_interval) - 1
+            pixel_value_index = round(pixel_value[0] / GRAY_SCALE_UNIT) - 1
             if pixel_value_index in range(len(cv_pairs)):
                 peak_integrate_draw.point(coord, cv_pairs[pixel_value_index][0])
 
@@ -102,14 +100,14 @@ def get_regional_peaks(layer_model, radar_img_size, mode, debug_folder_path=""):
     # Iterate layer model with specific index range
     immerse_img = Image.new("RGB", radar_img_size, (0, 0, 0))
     immerse_draw = ImageDraw.Draw(immerse_img)
-    cv_pairs = utils.get_color_bar_info("color_velocity_pairs")
+    cv_pairs = get_color_bar_info("color_velocity_pairs")
     peak_groups = []
     # items in this list have structure like (flag, echo_groups)
     # the flag is an int value that only in 0 or 1
     # echo_groups is the list of coordinates
     for layer_idx in layer_idx_range:
         # Calculate current layer value
-        current_layer_value = (layer_idx + 1) * gray_value_interval
+        current_layer_value = (layer_idx + 1) * GRAY_SCALE_UNIT
         current_layer_color = (current_layer_value, current_layer_value, current_layer_value)
 
         # Draw current layer echoes into the immerse image
@@ -143,10 +141,10 @@ def get_regional_peaks(layer_model, radar_img_size, mode, debug_folder_path=""):
                     stack = [echo_coord]
                     while stack:
                         current_coord = stack.pop()
-                        for offset in surrounding_offsets:
+                        for offset in SURROUNDING_OFFSETS:
                             neighbour_coord = (current_coord[0] + offset[0], current_coord[1] + offset[1])
                             neighbour_value = immerse_img.getpixel(neighbour_coord)
-                            neighbour_index = round(neighbour_value[0] / gray_value_interval) - 1
+                            neighbour_index = round(neighbour_value[0] / GRAY_SCALE_UNIT) - 1
                             # Check neighbour index value
                             if is_neg and 0 <= neighbour_index <= layer_idx:
                                 if neighbour_coord not in is_visited:
@@ -204,10 +202,10 @@ def get_regional_peaks(layer_model, radar_img_size, mode, debug_folder_path=""):
                 is_not_isolated = False
                 while stack:
                     current_coord = stack.pop()
-                    for offset in surrounding_offsets:
+                    for offset in SURROUNDING_OFFSETS:
                         neighbour_coord = (current_coord[0] + offset[0], current_coord[1] + offset[1])
                         neighbour_value = immerse_img.getpixel(neighbour_coord)
-                        neighbour_index = round(neighbour_value[0] / gray_value_interval) - 1
+                        neighbour_index = round(neighbour_value[0] / GRAY_SCALE_UNIT) - 1
                         if neighbour_index == layer_idx:
                             if neighbour_coord not in is_visited:
                                 is_visited.add(neighbour_coord)
@@ -233,7 +231,7 @@ def get_regional_peaks(layer_model, radar_img_size, mode, debug_folder_path=""):
         for peak_group_pair in peak_groups:
             for coord in peak_group_pair[1]:
                 echo_value = immerse_img.getpixel(coord)
-                echo_index = round(echo_value[0] / gray_value_interval) - 1
+                echo_index = round(echo_value[0] / GRAY_SCALE_UNIT) - 1
                 peak_debug_draw.point(coord, cv_pairs[echo_index][0])
         # Save debug image
         peak_debug_img.save(debug_folder_path + mode + "_peaks_" + str(layer_idx) + ".png")
@@ -252,7 +250,7 @@ def get_regional_peaks(layer_model, radar_img_size, mode, debug_folder_path=""):
     for peak_group in filtered_peak_groups:
         for echo_coord in peak_group:
             echo_value = immerse_img.getpixel(echo_coord)
-            echo_index = round(echo_value[0] / gray_value_interval) - 1
+            echo_index = round(echo_value[0] / GRAY_SCALE_UNIT) - 1
             filter_debug_draw.point(echo_coord, cv_pairs[echo_index][0])
 
     # Save debug result
@@ -269,8 +267,8 @@ def get_layer_model(filled_img):
     :return: layer model
     """
     # Get dependency data
-    radar_zone = utils.get_radar_info("radar_zone")
-    cv_pairs = utils.get_color_bar_info("color_velocity_pairs")
+    radar_zone = get_radar_info("radar_zone")
+    cv_pairs = get_color_bar_info("color_velocity_pairs")
 
     # Construct empty data structure
     layer_model = []
@@ -282,7 +280,7 @@ def get_layer_model(filled_img):
         for y in range(radar_zone[0], radar_zone[1]):
             # get current pixel value
             pixel_value = filled_img.getpixel((x, y))
-            gray_index = round(pixel_value[0] * 1.0 / gray_value_interval) - 1
+            gray_index = round(pixel_value[0] * 1.0 / GRAY_SCALE_UNIT) - 1
 
             if -1 < gray_index < len(cv_pairs):
                 layer_model[gray_index].append((x, y))

@@ -3,41 +3,56 @@ import os
 import time
 from tqdm import tqdm
 import random
+from colorama import Fore, Style
 from MesoDetect.DataIO.consts import (NEED_COVER_BOUNDARY_STATIONS, BASEMAP_IMG_PATH,
-                                      GRAY_SCALE_UNIT, NARROW_SURROUNDING_OFFSETS)
+                                      GRAY_SCALE_UNIT, NARROW_SURROUNDING_OFFSETS, CURRENT_DEBUG_RESULT_FOLDER)
 from MesoDetect.DataIO import radar_config
 
-CURRENT_DEBUG_RESULT_FOLDER = "DataIO/"
 
 
-"""
-Note that echoes are less possible to appear in same place on radar image across a wide range of time,
-while the boundary in radar image is static with same place. Therefore, this can be used to extract the boundary
-from several radar images of same station
-"""
-
-
-def get_gray_img(img_path: str, station_num: str, enable_debug: bool = False, image_debug_folder_path: str = ""):
+def radar_image_preprocess(
+        img_path: str,
+        station_num: str,
+        enable_debug: bool = False,
+        image_debug_folder_path: str = ""
+):
     """
-    Generate a gray image from original radar image as internal representation
-    as result of preprocessing, including boundary covering, radar echo extraction, and narrow filling.
-    :param img_path: path of original radar image
-    :param station_num: station number of radar image in string type
-    :param enable_debug: boolean flag for deciding whether to enable debug mode or not
-    :param image_debug_folder_path: path of debug result folder in string type
-    :return: PIL image object of gray image
+    Generating a gray scale image as internal representation of input radar image.
+    Args:
+        img_path: path of input original radar image.
+        station_num: station number in string type.
+        enable_debug: boolean flat that indicates whether debug mode is enabled.
+        image_debug_folder_path: images folder path.
+
+    Returns:
+        Gray scale image in PIL.Image format if successful.
+        None otherwise.
     """
+    print("[Info] Start preprocessing radar image...")
     # Check debug result folder if enable debug mode
     if enable_debug and image_debug_folder_path == "":
-        print("Error")
-        return
+        print(Fore.RED + "[Error] There is a conflict in given argument for `get_gray_img` "
+              "with image_debug_folder_path: {image_debug_folder_path} and enable_debug: {enable_debug}." + Style.RESET_ALL)
+        print(Fore.RED + "[Error] Radar image preprocessing failed." + Style.RESET_ALL)
+        return None
 
     # Read radar data
-    read_result_img = read_radar_image(img_path, station_num, enable_debug, image_debug_folder_path)
+    try:
+        read_result_img = read_radar_image(img_path, station_num, enable_debug, image_debug_folder_path)
+    except Exception as e:
+        print(Fore.RED + f"[Error] Exception: {e} raised when reading radar image." + Style.RESET_ALL)
+        print(Fore.RED + "[Error] Radar image preprocessing failed." + Style.RESET_ALL)
+        return None
 
     # Fill radar data
-    filled_img = narrow_fill(read_result_img, enable_debug, image_debug_folder_path)
+    try:
+        filled_img = narrow_fill(read_result_img, enable_debug, image_debug_folder_path)
+    except Exception as e:
+        print(Fore.RED + f"[Error] Exception: {e} raised when executing narrow filling." + Style.RESET_ALL)
+        print(Fore.RED + "[Error] Radar image preprocessing failed." + Style.RESET_ALL)
+        return None
 
+    print("[Info] Radar image preprocessing complete.")
     return filled_img
 
 
@@ -180,7 +195,7 @@ def narrow_fill(gray_img: Image, enable_debug: bool = False, image_debug_folder_
                     # Indicate that color value indexes are next to each other
                     # Use first average then round to get fill color value index
                     average_index = round((sum(valid_indexes) * 1.0) / len(valid_indexes))
-                    # Calculate gray value basemaps on the index value
+                    # Calculate gray value basemap on the index value
                     gray_value = (average_index + 1) * gray_value_interval
                     # Compose gray RGB color
                     gray_color = (gray_value, gray_value, gray_value)
@@ -211,7 +226,7 @@ def narrow_fill(gray_img: Image, enable_debug: bool = False, image_debug_folder_
                     random_align_index = random.choice(minimum_aligned_indexes)
                     # Restore gray index value from aligned index value
                     final_value_index = round(random_align_index + align_const - 1)
-                    # Calculate gray value basemaps on the gray index value
+                    # Calculate gray value basemap on the gray index value
                     gray_value = (final_value_index + 1) * gray_value_interval
                     # Compose RGB color
                     gray_color = (gray_value, gray_value, gray_value)

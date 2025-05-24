@@ -1,7 +1,7 @@
 from PIL import Image, ImageDraw
-from MesoDetect.ReadData import utils
-from MesoDetect.Preprocess.RadarDenoise import dependencies, consts
-from MesoDetect.ReadData.utils import gray_value_interval
+from MesoDetect.RadarDenoise import dependencies, consts
+from MesoDetect.DataIO.consts import GRAY_SCALE_UNIT, SURROUNDING_OFFSETS
+from MesoDetect.DataIO.radar_config import get_color_bar_info, get_radar_info
 
 
 def get_denoise_img(fill_img, layer_model, mode, debug_result_folder=""):
@@ -65,15 +65,15 @@ def remove_base_echoes(denoise_img, layer_model_len, mode, debug_result_folder="
 
     denoise_draw = ImageDraw.Draw(denoise_img)
     # Iterate radar zone to filter out basemaps echoes, but keep basemaps filled echoes
-    radar_zone = utils.get_radar_info("radar_zone")
+    radar_zone = get_radar_info("radar_zone")
     for x in range(radar_zone[0], radar_zone[1]):
         for y in range(radar_zone[0], radar_zone[1]):
             # Extract the second and third channel RGB color value for distinguish basemaps echo pixel
             pixel_value = denoise_img.getpixel((x, y))
             second_channel = pixel_value[1]
             third_channel = pixel_value[2]
-            second_channel_index = round(second_channel / gray_value_interval) - 1
-            third_channel_index = round(third_channel / gray_value_interval) - 1
+            second_channel_index = round(second_channel / GRAY_SCALE_UNIT) - 1
+            third_channel_index = round(third_channel / GRAY_SCALE_UNIT) - 1
             # Only basemaps echo that have different value in second and third channel RGB color
             if second_channel_index != third_channel_index:
                 # Indicate that current pixel is basemaps echo
@@ -110,7 +110,7 @@ def remove_small_isolated_groups(denoise_img, layer_model_len, mode, debug_resul
     # Get refer image for basemaps echo exclusion
     exclude_base_img = Image.new("RGB", denoise_img.size, (0, 0, 0))
     exclude_base_draw = ImageDraw.Draw(exclude_base_img)
-    radar_zone = utils.get_radar_info("radar_zone")
+    radar_zone = get_radar_info("radar_zone")
     # Iterate radar zone and get target echo list as well as drawing refer image
     exclude_img_echo_list = []
     for x in range(radar_zone[0], radar_zone[1]):
@@ -118,7 +118,7 @@ def remove_small_isolated_groups(denoise_img, layer_model_len, mode, debug_resul
             # Get pixel value from denoise image
             pixel_value = denoise_img.getpixel((x, y))
             # Calculate value index, use the second channel value for excluding basemaps echo
-            pixel_index = round(pixel_value[1] / gray_value_interval) - 1
+            pixel_index = round(pixel_value[1] / GRAY_SCALE_UNIT) - 1
             if pixel_index >= 0:
                 exclude_img_echo_list.append((x, y))
                 exclude_base_draw.point((x, y), consts.REFER_IMG_COLOR)
@@ -138,7 +138,7 @@ def remove_small_isolated_groups(denoise_img, layer_model_len, mode, debug_resul
                 denoise_draw.point(echo_coord, (0, 0, 0))
                 remove_debug_draw.point(echo_coord, (0, 255, 0))
     # Execute inner filling for denoise after exclude basemaps echo isolated echo groups removing
-    base_color_value = (base_index + 1) * gray_value_interval
+    base_color_value = (base_index + 1) * GRAY_SCALE_UNIT
     denoise_img = dependencies.inner_filling(denoise_img, (base_color_value, 0, base_color_value), denoise_img)
 
     # Save debug img
