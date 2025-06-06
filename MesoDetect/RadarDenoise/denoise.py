@@ -1,66 +1,57 @@
 from PIL import Image
-import os
 import time
+from colorama import Fore, Style
 from MesoDetect.RadarDenoise import layer_analysis, dependencies, velocity_integrate, velocity_unfold
+from MesoDetect.DataIO.folder_utils import check_output_folder
+from MesoDetect.RadarDenoise.consts import CURRENT_DEBUG_RESULT_FOLDER
 
-analysis_folder = "layer_denoise/"
-debug_folder = "layer_debug/"
+
 """
     layer denoise interface
 """
-def radar_denoise(folder_path, narrow_filled_path):
+def radar_denoise(
+        preprocessed_img: Image,
+        enable_debug: bool = False,
+        debug_output_path: str = ""
+):
     """
     Apply velocity layer analysis to denoise and velocity unfolding
     Args:
-        folder_path: path of result images folder
-        narrow_filled_path: path of narrow filled gray image
+        preprocessed_img: preprocessed radar image in internal gray format
+        enable_debug: boolean flag enabling debug mode for saving analysis result image
+        debug_output_path: output location path for analysis result image saving
 
-    Returns: path of analysis result image with string format
+    Returns: denoised image in PIL.Image type, None otherwise
 
     """
 
     start = time.time()
-    print("[Info] Start layer filling analysis...")
-    # Check result folder
-    analysis_result_folder = folder_path + analysis_folder
+    print("[Info] Start radar denoise process...")
+    if enable_debug:
+        if debug_output_path == "":
+            print(Fore.RED + f"[Error] Conflict parameters value: enable_debug: {enable_debug} "
+                             f"while debug_output_path: {debug_output_path}." + Style.RESET_ALL)
+            return None
+        debug_output_path = check_output_folder(debug_output_path, CURRENT_DEBUG_RESULT_FOLDER)
+        if debug_output_path is None:
+            print(Fore.RED + "[Error] Radar denoise process fail." + Style.RESET_ALL)
+            return None
 
-    if not os.path.exists(analysis_result_folder):
-        os.makedirs(analysis_result_folder)
-    analysis_debug_folder = analysis_result_folder + debug_folder
-    if not os.path.exists(analysis_debug_folder):
-        os.makedirs(analysis_debug_folder)
-
-    # Load images
-    fill_img = Image.open(narrow_filled_path)
-    # Get velocity layers list from the fill image
-    layer_model = dependencies.get_layer_model(fill_img)
+    # Get velocity layers list from the preprocessed image
+    layer_model = dependencies.get_layer_model(preprocessed_img)
 
     # Get denoise image
-    neg_denoise_img = layer_analysis.get_denoise_img(fill_img, layer_model, "neg", analysis_debug_folder)
-    pos_denoise_img = layer_analysis.get_denoise_img(fill_img, layer_model, "pos", analysis_debug_folder)
-
-    # Save denoise image
-    neg_denoise_img_path = analysis_result_folder + "neg_denoised.png"
-    pos_denoise_img_path = analysis_result_folder + "pos_denoised.png"
-    neg_denoise_img.save(neg_denoise_img_path)
-    pos_denoise_img.save(pos_denoise_img_path)
+    neg_denoise_img = layer_analysis.get_denoise_img(preprocessed_img, layer_model, "neg", enable_debug, debug_output_path)
+    pos_denoise_img = layer_analysis.get_denoise_img(preprocessed_img, layer_model, "pos", enable_debug, debug_output_path)
 
     # Integrate two denoised image
-    integrate_img = velocity_integrate.integrate_velocity_mode(neg_denoise_img, pos_denoise_img, analysis_debug_folder)
-
-    # Save integrated image
-    integrate_img_path = analysis_result_folder + "denoised_integrate.png"
-    integrate_img.save(integrate_img_path)
+    integrate_img = velocity_integrate.integrate_velocity_mode(neg_denoise_img, pos_denoise_img, enable_debug, debug_output_path)
 
     # Velocity unfolding
-    unfold_img = velocity_unfold.unfold_echoes(integrate_img, analysis_debug_folder)
-
-    # Save unfolded image
-    unfold_img_path = analysis_result_folder + "unfold.png"
-    unfold_img.save(unfold_img_path)
+    unfold_img = velocity_unfold.unfold_echoes(integrate_img, enable_debug, debug_output_path)
 
     end = time.time()
     duration = end - start
-    print(f"[Info] Duration of layer filling analysis: {duration:.4f} seconds.")
-    return neg_denoise_img_path, pos_denoise_img_path, integrate_img_path, unfold_img_path
+    print(f"[Info] Duration of radar denoise process: {duration:.4f} seconds.")
+    return neg_denoise_img, pos_denoise_img, integrate_img, unfold_img
 

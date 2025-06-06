@@ -99,6 +99,8 @@ def read_radar_image(radar_img_path, station_num: str, enable_debug: bool = Fals
     # Result images
     gray_img = Image.new("RGB", radar_img.size, (0, 0, 0))
     gray_draw = ImageDraw.Draw(gray_img)
+    read_debug_img = Image.new("RGB", radar_img.size, (0, 0, 0))
+    read_debug_draw = ImageDraw.Draw(read_debug_img)
 
     # Iterate the radar zone to read echo data
     radar_zone = radar_config.get_radar_info("radar_zone")
@@ -113,10 +115,12 @@ def read_radar_image(radar_img_path, station_num: str, enable_debug: bool = Fals
                 if all(abs(c1 - c2) <= 10 for c1, c2 in zip(pixel_value[:3], cv_pairs[idx][0][:3])):
                     gray_value = (idx + 1) * GRAY_SCALE_UNIT
                     gray_draw.point((x, y), (gray_value, gray_value, gray_value))
+                    read_debug_draw.point((x, y), cv_pairs[idx][0])
 
     if enable_debug and current_debug_folder_path != "":
-        read_result_path = current_debug_folder_path + "original_read.png"
+        read_result_path = current_debug_folder_path + "original_gray.png"
         gray_img.save(read_result_path)
+        read_debug_img.save(current_debug_folder_path + "read_debug.png")
 
     end = time.time()
     duration = end - start

@@ -1,7 +1,7 @@
 from PIL import Image, ImageDraw
-from MesoDetect.ReadData import utils
-from MesoDetect.Preprocess.RadarDenoise import dependencies, consts
-from MesoDetect.ReadData.utils import gray_value_interval
+from MesoDetect.DataIO.consts import GRAY_SCALE_UNIT, SURROUNDING_OFFSETS
+from MesoDetect.RadarDenoise import dependencies, consts
+from MesoDetect.DataIO.radar_config import get_radar_info, get_color_bar_info
 """
 crossed echo groups:
     1. small groups:
@@ -15,12 +15,16 @@ crossed echo groups:
         if not exceed, then draw the echo group    
     
 """
-def integrate_velocity_mode(neg_img, pos_img, debug_result_folder=""):
+"""
+    Interface: integrate_velocity_mode
+"""
+def integrate_velocity_mode(neg_img, pos_img, enable_debug, debug_result_folder=""):
     """
     Integrate neg and pos velocity mode denoise result image into complete radar image
     Args:
         neg_img: PIL Image object of neg denoise image
         pos_img: PIL Image object of pos denoise image
+        enable_debug: Boolean flag, True for enabling debug mode and False for disabling
         debug_result_folder: folder path for containing debug result image
 
     Returns:
@@ -30,7 +34,7 @@ def integrate_velocity_mode(neg_img, pos_img, debug_result_folder=""):
     integrate_img = Image.new("RGB", neg_img.size, (0, 0, 0))
 
    # Draw separate echoes and get crossed echo groups
-    crossed_groups, refer_img = get_crossed_echo_groups(neg_img, pos_img, integrate_img, debug_result_folder)
+    crossed_groups, refer_img = get_crossed_echo_groups(neg_img, pos_img, integrate_img, enable_debug, debug_result_folder)
 
     integrate_draw = ImageDraw.Draw(integrate_img)
     # Debug image for surrounding analysis
@@ -38,20 +42,19 @@ def integrate_velocity_mode(neg_img, pos_img, debug_result_folder=""):
     surrounding_debug_draw = ImageDraw.Draw(surrounding_debug_img)
 
     # Iterate each group and check the surroundings
-    radar_zone = utils.get_radar_info("radar_zone")
-    cv_pairs = utils.get_color_bar_info("color_velocity_pairs")
+    radar_zone = get_radar_info("radar_zone")
+    cv_pairs = get_color_bar_info("color_velocity_pairs")
     pos_unfold_idx = len(cv_pairs) - 1
-    surrounding_offsets = utils.surrounding_offsets
     for crossed_group in crossed_groups:
         # Get unrepeated surroundings
         surrounding_coords = set()
         for echo_coordinate in crossed_group:
-            for offset in surrounding_offsets:
+            for offset in SURROUNDING_OFFSETS:
                 # Get neighbour coordinate with offset
                 neighbour_coordinate = (echo_coordinate[0] + offset[0], echo_coordinate[1] + offset[1])
                 # Get neighbour value
                 neighbour_value = refer_img.getpixel(neighbour_coordinate)
-                neighbour_index = round(neighbour_value[0] / gray_value_interval) - 1
+                neighbour_index = round(neighbour_value[0] / GRAY_SCALE_UNIT) - 1
                 # Surrounding check
                 if neighbour_index == -1:
                     if neighbour_coordinate not in surrounding_coords:
@@ -70,7 +73,7 @@ def integrate_velocity_mode(neg_img, pos_img, debug_result_folder=""):
             # Get pixel value from neg image
             surrounding_value = neg_img.getpixel(coord)
             # Calculate index value
-            surrounding_index = round(surrounding_value[0] / gray_value_interval) - 1
+            surrounding_index = round(surrounding_value[0] / GRAY_SCALE_UNIT) - 1
             if surrounding_index >= 0:
                 valid_surroundings.append(surrounding_index)
         # Calculate valid surrounding ratio
@@ -91,8 +94,8 @@ def integrate_velocity_mode(neg_img, pos_img, debug_result_folder=""):
                 neg_pixel_value = neg_img.getpixel(coord)
                 pos_pixel_value = pos_img.getpixel(coord)
                 # Calculate value index
-                neg_pixel_index = round(neg_pixel_value[0] / gray_value_interval) - 1
-                pos_pixel_index = round(pos_pixel_value[0] / gray_value_interval) - 1
+                neg_pixel_index = round(neg_pixel_value[0] / GRAY_SCALE_UNIT) - 1
+                pos_pixel_index = round(pos_pixel_value[0] / GRAY_SCALE_UNIT) - 1
                 # Calculate distance
                 layer_gap = pos_pixel_index - neg_pixel_index
                 total_gap_sum += layer_gap
@@ -100,7 +103,7 @@ def integrate_velocity_mode(neg_img, pos_img, debug_result_folder=""):
             if avg_layer_gap >= consts.FOLDED_ECHO_CHECK_THRESHOLD:
                 # Indicate that current group is folded and on neg basemaps
                 for coord in crossed_group:
-                    neg_pixel_value = (0 + 1) * gray_value_interval
+                    neg_pixel_value = (0 + 1) * GRAY_SCALE_UNIT
                     neg_pixel_color = (neg_pixel_value, 0, neg_pixel_value)
                     integrate_draw.point(coord, neg_pixel_color)
                     surrounding_debug_draw.point(coord, neg_pixel_color)
@@ -112,7 +115,7 @@ def integrate_velocity_mode(neg_img, pos_img, debug_result_folder=""):
                 group_outer_scopes = []
                 for group_coord in crossed_group:
                     # Check each neighbour for the current group coordinate
-                    for offset in surrounding_offsets:
+                    for offset in SURROUNDING_OFFSETS:
                         neighbour_coord = (group_coord[0] + offset[0], group_coord[1] + offset[1])
                         if neighbour_coord not in crossed_group:
                             # Indicate that current group coord is outer scope echo
@@ -123,17 +126,17 @@ def integrate_velocity_mode(neg_img, pos_img, debug_result_folder=""):
                 for outer_coord in group_outer_scopes:
                     # Get current outer point value index
                     outer_value = integrate_img.getpixel(outer_coord)
-                    outer_index = round(outer_value[0] / gray_value_interval) - 1
+                    outer_index = round(outer_value[0] / GRAY_SCALE_UNIT) - 1
                     outer_layer_gap_sum = 0
                     outer_layer_gap_num = 0
                     # Get neighbour coord for current outer coordinate
-                    for offset in surrounding_offsets:
+                    for offset in SURROUNDING_OFFSETS:
                         neighbour_coord = (outer_coord[0] + offset[0], outer_coord[1] + offset[1])
                         # Filter out group coordinate
                         if neighbour_coord in crossed_group:
                             continue
                         neighbour_value = integrate_img.getpixel(neighbour_coord)
-                        neighbour_index = round(neighbour_value[0] / gray_value_interval) - 1
+                        neighbour_index = round(neighbour_value[0] / GRAY_SCALE_UNIT) - 1
                         if neighbour_index >= 0:
                             outer_layer_gap_sum += abs(outer_index - neighbour_index)
                             outer_layer_gap_num += 1
@@ -168,8 +171,8 @@ def integrate_velocity_mode(neg_img, pos_img, debug_result_folder=""):
                 neg_pixel_value = neg_img.getpixel(coord)
                 pos_pixel_value = pos_img.getpixel(coord)
                 # Calculate value index
-                neg_pixel_index = round(neg_pixel_value[0] / gray_value_interval) - 1
-                pos_pixel_index = round(pos_pixel_value[0] / gray_value_interval) - 1
+                neg_pixel_index = round(neg_pixel_value[0] / GRAY_SCALE_UNIT) - 1
+                pos_pixel_index = round(pos_pixel_value[0] / GRAY_SCALE_UNIT) - 1
                 # Calculate distance
                 layer_gap = pos_pixel_index - neg_pixel_index
                 total_gap_sum += layer_gap
@@ -177,7 +180,7 @@ def integrate_velocity_mode(neg_img, pos_img, debug_result_folder=""):
             if avg_layer_gap >= consts.FOLDED_ECHO_CHECK_THRESHOLD:
                 # Indicate that current group is folded and on neg basemaps
                 for coord in crossed_group:
-                    pos_pixel_value = (pos_unfold_idx + 1) * gray_value_interval
+                    pos_pixel_value = (pos_unfold_idx + 1) * GRAY_SCALE_UNIT
                     pos_pixel_color = (pos_pixel_value, 0, pos_pixel_value)
                     integrate_draw.point(coord, pos_pixel_color)
                     surrounding_debug_draw.point(coord, pos_pixel_color)
@@ -189,7 +192,7 @@ def integrate_velocity_mode(neg_img, pos_img, debug_result_folder=""):
                 group_outer_scopes = []
                 for group_coord in crossed_group:
                     # Check each neighbour for the current group coordinate
-                    for offset in surrounding_offsets:
+                    for offset in SURROUNDING_OFFSETS:
                         neighbour_coord = (group_coord[0] + offset[0], group_coord[1] + offset[1])
                         if neighbour_coord not in crossed_group:
                             # Indicate that current group coord is outer scope echo
@@ -200,17 +203,17 @@ def integrate_velocity_mode(neg_img, pos_img, debug_result_folder=""):
                 for outer_coord in group_outer_scopes:
                     # Get current outer point value index
                     outer_value = integrate_img.getpixel(outer_coord)
-                    outer_index = round(outer_value[0] / gray_value_interval) - 1
+                    outer_index = round(outer_value[0] / GRAY_SCALE_UNIT) - 1
                     outer_layer_gap_sum = 0
                     outer_layer_gap_num = 0
                     # Get neighbour coord for current outer coordinate
-                    for offset in surrounding_offsets:
+                    for offset in SURROUNDING_OFFSETS:
                         neighbour_coord = (outer_coord[0] + offset[0], outer_coord[1] + offset[1])
                         # Filter out group coordinate
                         if neighbour_coord in crossed_group:
                             continue
                         neighbour_value = integrate_img.getpixel(neighbour_coord)
-                        neighbour_index = round(neighbour_value[0] / gray_value_interval) - 1
+                        neighbour_index = round(neighbour_value[0] / GRAY_SCALE_UNIT) - 1
                         if neighbour_index >= 0:
                             outer_layer_gap_sum += abs(outer_index - neighbour_index)
                             outer_layer_gap_num += 1
@@ -231,15 +234,18 @@ def integrate_velocity_mode(neg_img, pos_img, debug_result_folder=""):
                         integrate_draw.point(coord, echo_value)
                         surrounding_debug_draw.point(coord, echo_value)
 
-    surrounding_debug_img.save(debug_result_folder + "surrounding_fill.png")
+    if enable_debug:
+        surrounding_debug_img.save(debug_result_folder + "surrounding_fill.png")
+        integrate_img_path = debug_result_folder + "denoised_integrate.png"
+        integrate_img.save(integrate_img_path)
 
     return integrate_img
 
 
-def get_crossed_echo_groups(neg_img, pos_img, integrate_img, debug_result_folder=""):
+def get_crossed_echo_groups(neg_img, pos_img, integrate_img, enable_debug, debug_result_folder=""):
     integrate_draw = ImageDraw.Draw(integrate_img)
     # Iterate through both neg and pos image to get uncrossed echoes
-    radar_zone = utils.get_radar_info("radar_zone")
+    radar_zone = get_radar_info("radar_zone")
     crossed_echoes = []
     for x in range(radar_zone[0], radar_zone[1]):
         for y in range(radar_zone[0], radar_zone[1]):
@@ -247,8 +253,8 @@ def get_crossed_echo_groups(neg_img, pos_img, integrate_img, debug_result_folder
             neg_pixel_value = neg_img.getpixel((x, y))
             pos_pixel_value = pos_img.getpixel((x, y))
             # Calculate gray value index of the pixel value
-            neg_pixel_index = round(neg_pixel_value[0] / gray_value_interval) - 1
-            pos_pixel_index = round(pos_pixel_value[0] / gray_value_interval) - 1
+            neg_pixel_index = round(neg_pixel_value[0] / GRAY_SCALE_UNIT) - 1
+            pos_pixel_index = round(pos_pixel_value[0] / GRAY_SCALE_UNIT) - 1
             # Check both index to decide echo get crossed or not
             if neg_pixel_index != -1 and pos_pixel_index == -1:
                 integrate_draw.point((x, y), neg_pixel_value)
@@ -262,7 +268,8 @@ def get_crossed_echo_groups(neg_img, pos_img, integrate_img, debug_result_folder
     refer_draw = ImageDraw.Draw(refer_img)
     for echo_coordinate in crossed_echoes:
         refer_draw.point(echo_coordinate, consts.REFER_IMG_COLOR)
-    refer_img.save(debug_result_folder + "crossed_refer.png")
+    if enable_debug:
+        refer_img.save(debug_result_folder + "crossed_refer.png")
 
     # Get crossed echo groups
     crossed_groups = dependencies.get_echo_groups(refer_img, crossed_echoes)

@@ -100,7 +100,7 @@ def inner_filling(refer_img, fill_color, fill_img):
     # Check valid fill color
     if len(fill_color) != 3:
         print(f"[Error] Invalid fill color: {fill_color} for `inner_filling`.")
-        return
+        return None
     # Get basic data
     gray_value_interval = GRAY_SCALE_UNIT
     radar_zone = get_radar_info("radar_zone")

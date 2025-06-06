@@ -3,61 +3,69 @@ from MesoDetect.RadarDenoise import dependencies, consts
 from MesoDetect.DataIO.consts import GRAY_SCALE_UNIT, SURROUNDING_OFFSETS
 from MesoDetect.DataIO.radar_config import get_color_bar_info, get_radar_info
 
-
-def get_denoise_img(fill_img, layer_model, mode, debug_result_folder=""):
+"""
+    Interface: get_denoise_img
+"""
+# regard debug_output_path is valid when calling this interface
+def get_denoise_img(fill_img, layer_model, mode, enable_debug, debug_output_path=""):
     """
     denoise given fill image and return denoised result image
     Args:
         fill_img: PIL Image Object of narrow filled image
         layer_model: list of layer echoes
         mode: string that indicates the velocity mode
-        debug_result_folder: debug result folder
+        enable_debug: boolean flag, True for enabling debug mode and False for disabling
+        debug_output_path: string value of debug output folder path
 
     Returns:
     PIL Image object of a denoised image
     """
     # Get basemaps echo image: Filter out Image Scale isolated echo group and draw echoes with two valid channel color
     denoise_img = get_base_echo_img(layer_model, fill_img.size, mode)
-    denoise_img.save(debug_result_folder + mode + "_base.png")
+    if enable_debug:
+        denoise_img.save(debug_output_path + mode + "_base.png")
 
     # Layer filter process: Draw large echo groups in Layer Scale and inner fill them for the holes in them and get small echo groups
-    denoise_img, small_echo_groups = layer_filter(fill_img, mode, denoise_img, layer_model, debug_result_folder)
+    denoise_img, small_echo_groups = layer_filter(fill_img, mode, denoise_img, layer_model, enable_debug, debug_output_path)
 
     # Small echo groups analysis: Draw echoes that does not exceed below or surrounding layer gap
-    denoise_img = small_echo_group_analysis(fill_img, denoise_img, mode, small_echo_groups, debug_result_folder)
+    denoise_img = small_echo_group_analysis(fill_img, denoise_img, mode, small_echo_groups, enable_debug, debug_output_path)
 
     # Remove small isolated echo that is basemaps on the basemaps echo
-    denoise_img = remove_small_isolated_groups(denoise_img, len(layer_model), mode, debug_result_folder)
+    denoise_img = remove_small_isolated_groups(denoise_img, len(layer_model), mode, enable_debug, debug_output_path)
 
     # Filling basemaps echo area
     denoise_img = base_echo_fill(denoise_img, len(layer_model), mode)
 
     # Remove basemaps echoes
-    denoise_img = remove_base_echoes(denoise_img, len(layer_model), mode, debug_result_folder)
+    denoise_img = remove_base_echoes(denoise_img, len(layer_model), mode, enable_debug, debug_output_path)
+
+    # Save debug image
+    if enable_debug:
+        denoise_img_path = debug_output_path + mode + "_denoised.png"
+        denoise_img.save(denoise_img_path)
 
     return denoise_img
 
 
-def remove_base_echoes(denoise_img, layer_model_len, mode, debug_result_folder=""):
+"""
+    Internal dependency functions
+"""
+def remove_base_echoes(denoise_img, layer_model_len, mode, enable_debug, debug_result_folder=""):
     """
 
     Args:
         denoise_img:
         layer_model_len:
         mode:
+        enable_debug:
         debug_result_folder:
 
     Returns:
 
     """
     # Check mode code
-    if mode == "neg":
-        base_value_index = round(layer_model_len / 2) - 1
-    elif mode == "pos":
-        base_value_index = round(layer_model_len / 2)
-    else:
-        print("Error")
-        return
+    base_value_index, _ = check_velocity_mode(mode, layer_model_len)
 
     # Debug image for process
     remove_debug_img = Image.new("RGB", denoise_img.size, (0, 0, 0))
@@ -81,12 +89,13 @@ def remove_base_echoes(denoise_img, layer_model_len, mode, debug_result_folder="
                 remove_debug_draw.point((x, y), (0, 255, 0))
 
     # Save debug image
-    remove_debug_img.save(debug_result_folder + mode + "_base_remove.png")
+    if enable_debug:
+        remove_debug_img.save(debug_result_folder + mode + "_base_remove.png")
 
     return denoise_img
 
 
-def remove_small_isolated_groups(denoise_img, layer_model_len, mode, debug_result_folder=""):
+def remove_small_isolated_groups(denoise_img, layer_model_len, mode, enable_debug, debug_result_folder=""):
     """
     Remove small isolated groups that is only surrounded by basemaps echoes in Image Scale,
     and inner fill the image after that.
@@ -94,19 +103,15 @@ def remove_small_isolated_groups(denoise_img, layer_model_len, mode, debug_resul
         denoise_img: PIL Image object of denoised image
         layer_model_len: length of layer model in Int value type
         mode: velocity mode code in str type, only allowed to be "neg" or "pos"
+        enable_debug:
         debug_result_folder: str type of debug result folder path
 
     Returns:
         PIL Image object of denoised image that has removed isolated echo groups
     """
     # Check mode code
-    if mode == "neg":
-        base_index = round(layer_model_len / 2) - 1
-    elif mode == "pos":
-        base_index = round(layer_model_len / 2)
-    else:
-        print()
-        return
+    base_index, _ = check_velocity_mode(mode, layer_model_len)
+
     # Get refer image for basemaps echo exclusion
     exclude_base_img = Image.new("RGB", denoise_img.size, (0, 0, 0))
     exclude_base_draw = ImageDraw.Draw(exclude_base_img)
@@ -122,7 +127,8 @@ def remove_small_isolated_groups(denoise_img, layer_model_len, mode, debug_resul
             if pixel_index >= 0:
                 exclude_img_echo_list.append((x, y))
                 exclude_base_draw.point((x, y), consts.REFER_IMG_COLOR)
-    exclude_base_img.save(debug_result_folder + mode + "_exclude_base.png")
+    if enable_debug:
+        exclude_base_img.save(debug_result_folder + mode + "_exclude_base.png")
 
     # Get echo groups from exclude basemaps image
     exclude_base_echo_groups = dependencies.get_echo_groups(exclude_base_img, exclude_img_echo_list)
@@ -142,20 +148,15 @@ def remove_small_isolated_groups(denoise_img, layer_model_len, mode, debug_resul
     denoise_img = dependencies.inner_filling(denoise_img, (base_color_value, 0, base_color_value), denoise_img)
 
     # Save debug img
-    remove_debug_img.save(debug_result_folder + mode + "_exclude_remove.png")
+    if enable_debug:
+        remove_debug_img.save(debug_result_folder + mode + "_exclude_remove.png")
     return denoise_img
 
 
-def small_echo_group_analysis(fill_img, denoise_img, mode, small_echo_groups, debug_result_folder=""):
+def small_echo_group_analysis(fill_img, denoise_img, mode, small_echo_groups, enable_debug, debug_result_folder=""):
     # Check mode code
-    if mode == "neg":
-        is_reverse = True
-    elif mode == "pos":
-        is_reverse = False
-    else:
-        print()
-        return
-    surrounding_offsets = utils.surrounding_offsets
+    is_reverse = check_velocity_mode(mode)
+
     denoise_draw = ImageDraw.Draw(denoise_img)
     for small_group in small_echo_groups:
         # Get below echo value of current group
@@ -165,11 +166,11 @@ def small_echo_group_analysis(fill_img, denoise_img, mode, small_echo_groups, de
         #   3. empty basemaps
         below_value = denoise_img.getpixel(small_group[0])
         # Calculate below value index using the second channel value
-        below_value_index = round(1.0 * below_value[1] / gray_value_interval) - 1
+        below_value_index = round(1.0 * below_value[1] / GRAY_SCALE_UNIT) - 1
 
         # Calculate small group actual value index
         current_group_value = fill_img.getpixel(small_group[0])
-        current_group_index = round(1.0 * current_group_value[0] / gray_value_interval) - 1
+        current_group_index = round(1.0 * current_group_value[0] / GRAY_SCALE_UNIT) - 1
         # Note that the absolute value of velocity is required to be increasing in this process when below echo is valid
         if below_value_index >= 0:
             # Indicate that current group is above valid echoes
@@ -184,7 +185,7 @@ def small_echo_group_analysis(fill_img, denoise_img, mode, small_echo_groups, de
                     denoise_draw.point(echo_coordinate, current_group_value)
         else:
             # Indicate that current group is above basemaps echoes or just empty
-            base_below_index = round(1.0 * below_value[0] / gray_value_interval) - 1
+            base_below_index = round(1.0 * below_value[0] / GRAY_SCALE_UNIT) - 1
             if base_below_index >= 0:
                 # Indicate that no empty but is basemaps echo
                 # Get surroundings
@@ -193,11 +194,11 @@ def small_echo_group_analysis(fill_img, denoise_img, mode, small_echo_groups, de
                 valid_surrounding_indexes = []
                 for echo_coordinate in small_group:
                     # Get valid echo neighbour coordinates
-                    for offset in surrounding_offsets:
+                    for offset in SURROUNDING_OFFSETS:
                         neighbour_coordinate = (echo_coordinate[0] + offset[0], echo_coordinate[1] + offset[1])
                         # Use filled image to calculate the surrounding set instead of denoise image
                         neighbour_value = denoise_img.getpixel(neighbour_coordinate)[1]
-                        neighbour_index = round(neighbour_value / gray_value_interval) - 1
+                        neighbour_index = round(neighbour_value / GRAY_SCALE_UNIT) - 1
                         if neighbour_coordinate not in small_group:
                             if neighbour_coordinate not in surroundings:
                                 surroundings.add(neighbour_coordinate)
@@ -221,7 +222,7 @@ def small_echo_group_analysis(fill_img, denoise_img, mode, small_echo_groups, de
                             # Indicate that current small group exceed the gap threshold with valid surroundings
                             # Calculate approximate average value index
                             round_avg_index = round(avg_surrounding_index)
-                            round_avg_value = (round_avg_index + 1) * gray_value_interval
+                            round_avg_value = (round_avg_index + 1) * GRAY_SCALE_UNIT
                             for echo_coordinate in small_group:
                                 denoise_draw.point(echo_coordinate, (round_avg_value, round_avg_value, round_avg_value))
                 else:
@@ -234,11 +235,12 @@ def small_echo_group_analysis(fill_img, denoise_img, mode, small_echo_groups, de
             # Because in the process of getting basemaps echo image, Image Scale small groups is removed
 
     # Save debug img
-    denoise_img.save(debug_result_folder + mode + "_small_filter.png")
+    if enable_debug:
+        denoise_img.save(debug_result_folder + mode + "_small_filter.png")
     return denoise_img
 
 
-def layer_filter(fill_img, mode, denoise_img, layer_model, debug_result_folder=""):
+def layer_filter(fill_img, mode, denoise_img, layer_model, enable_debug, debug_result_folder=""):
     """
     Execute layer filter process, for each layer, draw large trustworthy echo group and then inner filling the whole in them,
     in the meantime, collect small echo groups in Layer Scale for latter analysis
@@ -247,33 +249,26 @@ def layer_filter(fill_img, mode, denoise_img, layer_model, debug_result_folder="
         mode:
         denoise_img:
         layer_model:
+        enable_debug:
         debug_result_folder:
 
     Returns:
 
     """
     # Check mode code
-    if mode == "neg":
-        base_index = round(len(layer_model) / 2) - 1
-        layer_range = range(base_index, -1, -1)
-    elif mode == "pos":
-        base_index = round(len(layer_model) / 2)
-        layer_range = range(base_index, len(layer_model))
-    else:
-        print()
-        return
+    base_index, layer_range = check_velocity_mode(mode, len(layer_model))
 
     # Keep echo groups which size exceed size threshold that is more likely to be trustful
     denoise_draw = ImageDraw.Draw(denoise_img)
     small_echo_groups = []
-    cv_pairs = utils.get_color_bar_info("color_velocity_pairs")
+    cv_pairs = get_color_bar_info("color_velocity_pairs")
     for layer_idx in layer_range:
         # Create a debug image for each layer
         layer_debug_img = Image.new("RGB", denoise_img.size, (0, 0, 0))
         layer_debug_draw = ImageDraw.Draw(layer_debug_img)
 
         # Calculate gray color value for current layer
-        layer_echo_value = (layer_idx + 1) * gray_value_interval
+        layer_echo_value = (layer_idx + 1) * GRAY_SCALE_UNIT
         echo_color = (layer_echo_value, layer_echo_value, layer_echo_value)
 
         # Create an inner filling refer image
@@ -299,9 +294,11 @@ def layer_filter(fill_img, mode, denoise_img, layer_model, debug_result_folder="
         denoise_img = dependencies.inner_filling(inner_fill_refer_img, echo_color, denoise_img)
         layer_debug_img = dependencies.inner_filling(inner_fill_refer_img, (255, 0, 255), layer_debug_img)
         denoise_draw = ImageDraw.Draw(denoise_img)
-        layer_debug_img.save(debug_result_folder + mode + "_layer_debug_" + str(layer_idx) + ".png")
+        if enable_debug:
+            layer_debug_img.save(debug_result_folder + mode + "_layer_debug_" + str(layer_idx) + ".png")
     # Save debug image
-    denoise_img.save(debug_result_folder + mode + "_smooth.png")
+    if enable_debug:
+        denoise_img.save(debug_result_folder + mode + "_smooth.png")
     return denoise_img, small_echo_groups
 
 
@@ -322,21 +319,13 @@ def get_base_echo_img(layer_model, radar_img_size, mode):
         A PIL Image Object of basemaps velocity image
     """
     # Check mode code
-    if mode == "neg":
-        base_index = round(len(layer_model) / 2) - 1
-        layer_range = range(base_index, -1, -1)
-    elif mode == "pos":
-        base_index = round(len(layer_model) / 2)
-        layer_range = range(base_index, len(layer_model))
-    else:
-        print()
-        return
+    base_index, layer_range = check_velocity_mode(mode, len(layer_model))
 
     # Create an empty image
     base_img = Image.new("RGB", radar_img_size, (0, 0, 0))
     base_draw = ImageDraw.Draw(base_img)
     # Get basic values
-    base_value = gray_value_interval * (base_index + 1)
+    base_value = GRAY_SCALE_UNIT * (base_index + 1)
     # Use two valid channel color to distinguish basemaps echo
     base_color = (base_value, 0, base_value)
     # Iterate each layer for draw all echo as basemaps echo
@@ -349,14 +338,14 @@ def get_base_echo_img(layer_model, radar_img_size, mode):
 
     # Get all basemaps echo pixel coordinate
     echo_pixel_list = []
-    radar_zone = utils.get_radar_info("radar_zone")
+    radar_zone = get_radar_info("radar_zone")
     for x in range(radar_zone[0], radar_zone[1]):
         for y in range(radar_zone[0], radar_zone[1]):
             # Get current pixel value
             pixel_coordinate = (x, y)
             pixel_value = base_img.getpixel(pixel_coordinate)[0]
             # Calculate color value index of the pixel
-            pixel_index = round(1.0 * pixel_value / gray_value_interval) - 1
+            pixel_index = round(1.0 * pixel_value / GRAY_SCALE_UNIT) - 1
             if pixel_index != -1:
                 echo_pixel_list.append(pixel_coordinate)
 
@@ -392,15 +381,10 @@ def base_echo_fill(gray_img, layer_model_len, mode):
 
     """
     # Check mode code
-    if mode == "neg":
-        base_index = round(layer_model_len / 2) - 1
-    elif mode == "pos":
-        base_index = round(layer_model_len / 2)
-    else:
-        print()
-        return
+    base_index, _ = check_velocity_mode(mode, layer_model_len)
+
     # get basemaps echo color value
-    base_color_value = (base_index + 1) * gray_value_interval
+    base_color_value = (base_index + 1) * GRAY_SCALE_UNIT
     base_color = (base_color_value, base_color_value, base_color_value)
 
     # Create a refer image for grouping
@@ -408,15 +392,15 @@ def base_echo_fill(gray_img, layer_model_len, mode):
     refer_draw = ImageDraw.Draw(refer_img)
 
     # Iterate radar zone to get need fill area
-    radar_zone = utils.get_radar_info("radar_zone")
+    radar_zone = get_radar_info("radar_zone")
     base_echo_list = []
     for x in range(radar_zone[0], radar_zone[1]):
         for y in range(radar_zone[0], radar_zone[1]):
             # Get current pixel value
             pixel_value = gray_img.getpixel((x, y))
             # Calculate gray value index
-            pixel_index_0 = round(pixel_value[0] / gray_value_interval) - 1     # First channel value
-            pixel_index_1 = round(pixel_value[1] / gray_value_interval) - 1     # Second channel value
+            pixel_index_0 = round(pixel_value[0] / GRAY_SCALE_UNIT) - 1     # First channel value
+            pixel_index_1 = round(pixel_value[1] / GRAY_SCALE_UNIT) - 1     # Second channel value
             # Check whether is basemaps echo or not
             if pixel_index_0 != pixel_index_1:
                 base_echo_list.append((x, y))
@@ -424,7 +408,6 @@ def base_echo_fill(gray_img, layer_model_len, mode):
 
     # Get basemaps echo groups
     base_echo_groups = dependencies.get_echo_groups(refer_img, base_echo_list)
-    surrounding_offsets = utils.surrounding_offsets
     # Analise each group's surrounding
     gray_draw = ImageDraw.Draw(gray_img)
     for echo_group in base_echo_groups:
@@ -432,11 +415,11 @@ def base_echo_fill(gray_img, layer_model_len, mode):
         surroundings = set()
         valid_surrounding_indexes = []
         for echo_coordinate in echo_group:
-            for offset in surrounding_offsets:
+            for offset in SURROUNDING_OFFSETS:
                 neighbour_coordinate = (echo_coordinate[0] + offset[0], echo_coordinate[1] + offset[1])
                 neighbour_value = gray_img.getpixel(neighbour_coordinate)
-                neighbour_index_0 = round(neighbour_value[0] / gray_value_interval) - 1
-                neighbour_index_1 = round(neighbour_value[1] / gray_value_interval) - 1
+                neighbour_index_0 = round(neighbour_value[0] / GRAY_SCALE_UNIT) - 1
+                neighbour_index_1 = round(neighbour_value[1] / GRAY_SCALE_UNIT) - 1
                 if neighbour_index_0 == neighbour_index_1:
                     # Indicate that current neighbor is not basemaps echo
                     if neighbour_coordinate not in surroundings:
@@ -453,8 +436,30 @@ def base_echo_fill(gray_img, layer_model_len, mode):
             # Calculate average surrounding index
             avg_surrounding_idx = sum(valid_surrounding_indexes) / len(valid_surrounding_indexes)
             round_avg_idx = round(avg_surrounding_idx)
-            avg_value = (round_avg_idx + 1) * gray_value_interval
+            avg_value = (round_avg_idx + 1) * GRAY_SCALE_UNIT
             for echo_coordinate in echo_group:
                 # Note that the basemaps filling value is one valid channel RGB color
                 gray_draw.point(echo_coordinate, (avg_value, 0, 0))
     return gray_img
+
+
+def check_velocity_mode(mode: str, layer_model_len: int = -1):
+    if mode == "neg":
+        if layer_model_len != -1:
+            base_index = round(layer_model_len / 2) - 1
+            layer_range = range(base_index, -1, -1)
+            return base_index, layer_range
+        else:
+            is_reverse = True
+            return is_reverse
+    elif mode == "pos":
+        if layer_model_len != -1:
+            base_index = round(layer_model_len / 2)
+            layer_range = range(base_index, layer_model_len)
+            return base_index, layer_range
+        else:
+            is_reverse = False
+            return is_reverse
+    else:
+        print(f"[Error] Invalid mode code: {mode}.")
+        return None

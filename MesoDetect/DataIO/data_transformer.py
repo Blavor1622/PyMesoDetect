@@ -4,11 +4,11 @@ from MesoDetect.DataIO.consts import GRAY_SCALE_UNIT
 from MesoDetect.DataIO import radar_config
 
 
-def visualize_result(folder_path, gray_img_path, result_name):
+def visualize_result(folder_path, gray_img, result_name):
     """
     Turning gray image into original radar image for visualization the preprocess result.
     :param folder_path: path of result folder
-    :param gray_img_path: path of gray image
+    :param gray_img: PIL Image object of gray image
     :param result_name: name of visualized result image
     :return: path of visualization result image
     """
@@ -16,9 +16,6 @@ def visualize_result(folder_path, gray_img_path, result_name):
     visualize_result_path = folder_path + "visualization/"
     if not os.path.exists(visualize_result_path):
         os.makedirs(visualize_result_path)
-
-    # Load gray image into PIL Image object
-    gray_img = Image.open(gray_img_path)
 
     # Create visualization result image
     visual_img = Image.new("RGB", gray_img.size, (0, 0, 0))

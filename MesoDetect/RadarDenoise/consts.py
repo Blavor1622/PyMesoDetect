@@ -47,3 +47,6 @@ OPPOSITE_COMPOSE_THRESHOLD = 0.98
 
 # number of layer that might contain folded echo
 FOLDED_LAYER_NUM = 3
+
+# Default debug image folder name
+CURRENT_DEBUG_RESULT_FOLDER = "RadarDenoise/"

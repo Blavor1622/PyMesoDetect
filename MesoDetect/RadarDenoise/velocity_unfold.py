@@ -1,9 +1,19 @@
 from PIL import Image, ImageDraw
-from MesoDetect.Preprocess.RadarDenoise import dependencies, consts
-from MesoDetect.ReadData.utils import surrounding_offsets, gray_value_interval
+from MesoDetect.RadarDenoise import dependencies, consts
+from MesoDetect.DataIO.consts import GRAY_SCALE_UNIT, SURROUNDING_OFFSETS
 
 
-def unfold_echoes(integrated_img, debug_result_folder=""):
+def unfold_echoes(integrated_img, enable_debug, debug_result_folder=""):
+    """
+
+    Args:
+        integrated_img:
+        enable_debug:
+        debug_result_folder:
+
+    Returns:
+
+    """
     # Get layer model of integrated image
     layer_model = dependencies.get_layer_model(integrated_img)
 
@@ -11,24 +21,24 @@ def unfold_echoes(integrated_img, debug_result_folder=""):
     unfold_img = integrated_img.copy()
 
     # Neg unfolding
-    unfold_img = folded_echo_analysis(layer_model, integrated_img, unfold_img, "neg", debug_result_folder)
+    unfold_img = folded_echo_analysis(layer_model, integrated_img, unfold_img, "neg", enable_debug, debug_result_folder)
 
     # Pos unfolding
-    unfold_img = folded_echo_analysis(layer_model, integrated_img, unfold_img, "pos", debug_result_folder)
+    unfold_img = folded_echo_analysis(layer_model, integrated_img, unfold_img, "pos", enable_debug, debug_result_folder)
 
     return unfold_img
 
 
-def folded_echo_analysis(layer_model, integrated_img, unfold_img, mode, debug_result_folder=""):
+def folded_echo_analysis(layer_model, integrated_img, unfold_img, mode, enable_debug, debug_result_folder=""):
     # Check mode code
     if mode == "neg":
         target_indexes = range(len(layer_model) - consts.FOLDED_LAYER_NUM, len(layer_model))
-        unfolded_value = (0 + 1) * gray_value_interval
+        unfolded_value = (0 + 1) * GRAY_SCALE_UNIT
         unfolded_color = (unfolded_value, unfolded_value, unfolded_value)
         is_reversed = False
     elif mode == "pos":
         target_indexes = range(0 + consts.FOLDED_LAYER_NUM - 1, -1, -1)
-        unfolded_value = (len(layer_model) - 1 + 1) * gray_value_interval
+        unfolded_value = (len(layer_model) - 1 + 1) * GRAY_SCALE_UNIT
         unfolded_color = (unfolded_value, unfolded_value, unfolded_value)
         is_reversed = True
     else:
@@ -64,17 +74,17 @@ def folded_echo_analysis(layer_model, integrated_img, unfold_img, mode, debug_re
         valid_surrounding_indexes = []
         opposite_mode_indexes = []
         for coord in echo_group:
-            for offset in surrounding_offsets:
+            for offset in SURROUNDING_OFFSETS:
                 neighbour_coord = (coord[0] + offset[0], coord[1] + offset[1])
                 # Extract current pixel color from refer image to decide whether is surrounding or not
                 neighbour_refer_value = refer_img.getpixel(neighbour_coord)
-                neighbour_refer_index = round(neighbour_refer_value[0] / gray_value_interval) - 1
+                neighbour_refer_index = round(neighbour_refer_value[0] / GRAY_SCALE_UNIT) - 1
                 if neighbour_refer_index == -1:
                     # Indicate that current neighbour pixel is not in the group
                     if neighbour_coord not in surroundings:
                         surroundings.add(neighbour_coord)
                         neighbour_value = integrated_img.getpixel(neighbour_coord)
-                        neighbour_index = round(neighbour_value[0] / gray_value_interval) - 1
+                        neighbour_index = round(neighbour_value[0] / GRAY_SCALE_UNIT) - 1
                         if neighbour_index >= 0:
                             valid_surrounding_indexes.append(neighbour_index)
                             if not is_reversed and neighbour_index <= half_index:
@@ -95,6 +105,9 @@ def folded_echo_analysis(layer_model, integrated_img, unfold_img, mode, debug_re
                         debug_draw.point(coord, (0, 255, 0))
 
     # Save debug image
-    debug_img.save(debug_result_folder + mode + "_unfold_debug.png")
+    if enable_debug:
+        debug_img.save(debug_result_folder + mode + "_unfold_debug.png")
+        unfold_img_path = debug_result_folder + "unfold.png"
+        unfold_img.save(unfold_img_path)
 
     return unfold_img
