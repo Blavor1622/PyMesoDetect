@@ -3,12 +3,12 @@ import numpy as np
 from skimage.segmentation import flood_fill
 from MesoDetect.DataIO.radar_config import get_radar_info, get_color_bar_info
 from MesoDetect.DataIO.consts import GRAY_SCALE_UNIT, SURROUNDING_OFFSETS
-
+from typing import List, Tuple, Optional
 
 """
     Internal Dependency Functions
 """
-def get_layer_model(filled_img):
+def get_layer_model(filled_img: Image) -> List[List[Tuple[int, int]]]:
     """
     Generate a list of same velocity echo coordinate lists that have same length and according index
     value with the color velocity pairs
@@ -18,7 +18,6 @@ def get_layer_model(filled_img):
     # Get dependency data
     radar_zone = get_radar_info("radar_zone")
     cv_pairs = get_color_bar_info("color_velocity_pairs")
-    gray_value_interval = GRAY_SCALE_UNIT
 
     # Construct empty data structure
     layer_model = []
@@ -30,15 +29,13 @@ def get_layer_model(filled_img):
         for y in range(radar_zone[0], radar_zone[1]):
             # get current pixel value
             pixel_value = filled_img.getpixel((x, y))
-            gray_index = round(pixel_value[0] * 1.0 / gray_value_interval) - 1
-
+            gray_index = round(pixel_value[0] * 1.0 / GRAY_SCALE_UNIT) - 1
             if -1 < gray_index < len(cv_pairs):
                 layer_model[gray_index].append((x, y))
-
     return layer_model
 
 
-def get_echo_groups(refer_img, coordinate_list):
+def get_echo_groups(refer_img: Image, coordinate_list: List[Tuple[int, int]]) -> List[List[Tuple[int, int]]]:
     """
     a utility function that divides the given coordinate_list
     and then return a list of connected components
@@ -47,17 +44,16 @@ def get_echo_groups(refer_img, coordinate_list):
     :return: a list of connected components
     """
     if len(coordinate_list) == 0:
-        return [[]]
+        return []
     # get neighbour coordinate offset
     neighbour_offsets = SURROUNDING_OFFSETS
 
     # Get radar zone
     radar_zone = get_radar_info("radar_zone")
-    gray_value_interval = GRAY_SCALE_UNIT
 
     # Extract gray value index of current point
     target_value = refer_img.getpixel(coordinate_list[0])[0]
-    target_index = round(1.0 * target_value / gray_value_interval) - 1
+    target_index = round(1.0 * target_value / GRAY_SCALE_UNIT) - 1
 
     components = []
     visited = set()
@@ -78,7 +74,7 @@ def get_echo_groups(refer_img, coordinate_list):
                     if (radar_zone[0] <= neighbour[0] <= radar_zone[1]
                             and radar_zone[0] <= neighbour[1] <= radar_zone[1]):
                         neighbour_value = refer_img.getpixel(neighbour)[0]
-                        if round(neighbour_value * 1.0 / gray_value_interval) - 1 == target_index:
+                        if round(neighbour_value * 1.0 / GRAY_SCALE_UNIT) - 1 == target_index:
                             # Mean that neighbour value similar to target value (slight difference is allowed)
                             if neighbour not in visited:
                                 visited.add(neighbour)
@@ -88,7 +84,7 @@ def get_echo_groups(refer_img, coordinate_list):
     return components
 
 
-def inner_filling(refer_img, fill_color, fill_img):
+def inner_filling(refer_img: Image, fill_color: Tuple[int, int, int], fill_img: Image) -> Optional[Image]:
     """
     Flooding outer blanks in given gray image and fill inner blanks of the image with
     gray color that gray value index indicates

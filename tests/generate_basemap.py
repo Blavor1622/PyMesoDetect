@@ -77,7 +77,7 @@ def extract_white_boundary(input_folder, station_num, result_folder):
 
 
 if __name__ == "__main__":
-    images_folder_path = ""
+    images_folder_path = "C:/Users/Blavor/Desktop/zh/"
     radar_station_num = "Z9756"
-    extract_result_folder_path = ""
+    extract_result_folder_path = "C:/Users/Blavor/Desktop/"
     extract_white_boundary(images_folder_path, radar_station_num, extract_result_folder_path)

@@ -1,19 +1,22 @@
 from PIL import Image, ImageDraw
 from MesoDetect.RadarDenoise import dependencies, consts
 from MesoDetect.DataIO.consts import GRAY_SCALE_UNIT, SURROUNDING_OFFSETS
+from colorama import Fore, Style
+from pathlib import Path
+from typing import List, Tuple
 
-
-def unfold_echoes(integrated_img, enable_debug, debug_result_folder=""):
+def unfold_echoes(integrated_img: Image, enable_debug: bool, debug_result_folder: Path) -> Image:
     """
-
+        Process folded echoes from given integrated radar image.
     Args:
-        integrated_img:
+        integrated_img: integrated radar image in PIL object type
         enable_debug:
         debug_result_folder:
 
     Returns:
 
     """
+    print("[Info] Start unfolding echoes...")
     # Get layer model of integrated image
     layer_model = dependencies.get_layer_model(integrated_img)
 
@@ -26,10 +29,18 @@ def unfold_echoes(integrated_img, enable_debug, debug_result_folder=""):
     # Pos unfolding
     unfold_img = folded_echo_analysis(layer_model, integrated_img, unfold_img, "pos", enable_debug, debug_result_folder)
 
+    print("[Info] Echoes unfolding success.")
     return unfold_img
 
 
-def folded_echo_analysis(layer_model, integrated_img, unfold_img, mode, enable_debug, debug_result_folder=""):
+def folded_echo_analysis(
+        layer_model: List[List[Tuple[int, int]]],
+        integrated_img: Image,
+        unfold_img: Image,
+        mode: str,
+        enable_debug: bool,
+        debug_result_folder: Path
+) -> Image:
     # Check mode code
     if mode == "neg":
         target_indexes = range(len(layer_model) - consts.FOLDED_LAYER_NUM, len(layer_model))
@@ -42,8 +53,8 @@ def folded_echo_analysis(layer_model, integrated_img, unfold_img, mode, enable_d
         unfolded_color = (unfolded_value, unfolded_value, unfolded_value)
         is_reversed = True
     else:
-        print("Error")
-        return
+        print(Fore.RED + f"[Error] Invalid mode code: {mode} for `folded_echo_analysis` call." + Style.RESET_ALL)
+        return None
 
     # Get basic data
     half_index = round(len(layer_model) / 2) - 1
@@ -106,8 +117,7 @@ def folded_echo_analysis(layer_model, integrated_img, unfold_img, mode, enable_d
 
     # Save debug image
     if enable_debug:
-        debug_img.save(debug_result_folder + mode + "_unfold_debug.png")
-        unfold_img_path = debug_result_folder + "unfold.png"
-        unfold_img.save(unfold_img_path)
+        debug_img.save(debug_result_folder / (mode + "_unfold_debug.png"))
+        unfold_img.save(debug_result_folder / "unfold.png")
 
     return unfold_img

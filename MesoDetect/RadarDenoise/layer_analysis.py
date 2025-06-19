@@ -2,28 +2,36 @@ from PIL import Image, ImageDraw
 from MesoDetect.RadarDenoise import dependencies, consts
 from MesoDetect.DataIO.consts import GRAY_SCALE_UNIT, SURROUNDING_OFFSETS
 from MesoDetect.DataIO.radar_config import get_color_bar_info, get_radar_info
+from typing import List, Tuple
+from pathlib import Path
 
 """
     Interface: get_denoise_img
 """
 # regard debug_output_path is valid when calling this interface
-def get_denoise_img(fill_img, layer_model, mode, enable_debug, debug_output_path=""):
+def get_denoise_img(
+        fill_img: Image,
+        layer_model: List[List[Tuple[int, int]]],
+        mode: str, enable_debug: bool,
+        debug_output_path: Path
+) -> Image:
     """
-    denoise given fill image and return denoised result image
+    denoise given filled image and return denoised result image
     Args:
         fill_img: PIL Image Object of narrow filled image
         layer_model: list of layer echoes
         mode: string that indicates the velocity mode
         enable_debug: boolean flag, True for enabling debug mode and False for disabling
-        debug_output_path: string value of debug output folder path
+        debug_output_path: pathlib path type of output image path
 
     Returns:
     PIL Image object of a denoised image
     """
+    print(f"[Info] Start generating {mode} denoise image...")
     # Get basemaps echo image: Filter out Image Scale isolated echo group and draw echoes with two valid channel color
     denoise_img = get_base_echo_img(layer_model, fill_img.size, mode)
     if enable_debug:
-        denoise_img.save(debug_output_path + mode + "_base.png")
+        denoise_img.save(debug_output_path / (mode + "_base.png"))
 
     # Layer filter process: Draw large echo groups in Layer Scale and inner fill them for the holes in them and get small echo groups
     denoise_img, small_echo_groups = layer_filter(fill_img, mode, denoise_img, layer_model, enable_debug, debug_output_path)
@@ -42,28 +50,16 @@ def get_denoise_img(fill_img, layer_model, mode, enable_debug, debug_output_path
 
     # Save debug image
     if enable_debug:
-        denoise_img_path = debug_output_path + mode + "_denoised.png"
-        denoise_img.save(denoise_img_path)
+        denoise_img.save(debug_output_path / (mode + "_denoised.png"))
 
+    print(f"[Info] {mode} denoise image generation success.")
     return denoise_img
 
 
 """
     Internal dependency functions
 """
-def remove_base_echoes(denoise_img, layer_model_len, mode, enable_debug, debug_result_folder=""):
-    """
-
-    Args:
-        denoise_img:
-        layer_model_len:
-        mode:
-        enable_debug:
-        debug_result_folder:
-
-    Returns:
-
-    """
+def remove_base_echoes(denoise_img: Image, layer_model_len: int, mode: str, enable_debug: bool, debug_result_folder: Path) -> Image:
     # Check mode code
     base_value_index, _ = check_velocity_mode(mode, layer_model_len)
 
@@ -90,12 +86,12 @@ def remove_base_echoes(denoise_img, layer_model_len, mode, enable_debug, debug_r
 
     # Save debug image
     if enable_debug:
-        remove_debug_img.save(debug_result_folder + mode + "_base_remove.png")
+        remove_debug_img.save(debug_result_folder / (mode + "_base_remove.png"))
 
     return denoise_img
 
 
-def remove_small_isolated_groups(denoise_img, layer_model_len, mode, enable_debug, debug_result_folder=""):
+def remove_small_isolated_groups(denoise_img: Image, layer_model_len: int, mode: str, enable_debug: bool, debug_result_folder: Path) -> Image:
     """
     Remove small isolated groups that is only surrounded by basemaps echoes in Image Scale,
     and inner fill the image after that.
@@ -128,7 +124,7 @@ def remove_small_isolated_groups(denoise_img, layer_model_len, mode, enable_debu
                 exclude_img_echo_list.append((x, y))
                 exclude_base_draw.point((x, y), consts.REFER_IMG_COLOR)
     if enable_debug:
-        exclude_base_img.save(debug_result_folder + mode + "_exclude_base.png")
+        exclude_base_img.save(debug_result_folder / (mode + "_exclude_base.png"))
 
     # Get echo groups from exclude basemaps image
     exclude_base_echo_groups = dependencies.get_echo_groups(exclude_base_img, exclude_img_echo_list)
@@ -149,11 +145,17 @@ def remove_small_isolated_groups(denoise_img, layer_model_len, mode, enable_debu
 
     # Save debug img
     if enable_debug:
-        remove_debug_img.save(debug_result_folder + mode + "_exclude_remove.png")
+        remove_debug_img.save(debug_result_folder / (mode + "_exclude_remove.png"))
     return denoise_img
 
 
-def small_echo_group_analysis(fill_img, denoise_img, mode, small_echo_groups, enable_debug, debug_result_folder=""):
+def small_echo_group_analysis(
+        fill_img: Image,
+        denoise_img: Image, mode: str,
+        small_echo_groups: List[List[Tuple[int, int]]],
+        enable_debug: bool,
+        debug_result_folder: Path
+) -> Image:
     # Check mode code
     is_reverse = check_velocity_mode(mode)
 
@@ -236,24 +238,14 @@ def small_echo_group_analysis(fill_img, denoise_img, mode, small_echo_groups, en
 
     # Save debug img
     if enable_debug:
-        denoise_img.save(debug_result_folder + mode + "_small_filter.png")
+        denoise_img.save(debug_result_folder / (mode + "_small_filter.png"))
     return denoise_img
 
 
-def layer_filter(fill_img, mode, denoise_img, layer_model, enable_debug, debug_result_folder=""):
+def layer_filter(fill_img: Image, mode: str, denoise_img: Image, layer_model: List[List[Tuple[int, int]]], enable_debug: bool, debug_result_folder: Path):
     """
     Execute layer filter process, for each layer, draw large trustworthy echo group and then inner filling the whole in them,
     in the meantime, collect small echo groups in Layer Scale for latter analysis
-    Args:
-        fill_img:
-        mode:
-        denoise_img:
-        layer_model:
-        enable_debug:
-        debug_result_folder:
-
-    Returns:
-
     """
     # Check mode code
     base_index, layer_range = check_velocity_mode(mode, len(layer_model))
@@ -295,17 +287,17 @@ def layer_filter(fill_img, mode, denoise_img, layer_model, enable_debug, debug_r
         layer_debug_img = dependencies.inner_filling(inner_fill_refer_img, (255, 0, 255), layer_debug_img)
         denoise_draw = ImageDraw.Draw(denoise_img)
         if enable_debug:
-            layer_debug_img.save(debug_result_folder + mode + "_layer_debug_" + str(layer_idx) + ".png")
+            layer_debug_img.save(debug_result_folder / (mode + "_layer_debug_" + str(layer_idx) + ".png"))
     # Save debug image
     if enable_debug:
-        denoise_img.save(debug_result_folder + mode + "_smooth.png")
+        denoise_img.save(debug_result_folder / (mode + "_smooth.png"))
     return denoise_img, small_echo_groups
 
 
 """
 Note: image scale small group and layer scale small group are distinct. 
 """
-def get_base_echo_img(layer_model, radar_img_size, mode):
+def get_base_echo_img(layer_model: List[List[Tuple[int, int]]], radar_img_size: Tuple[int, int], mode: str) -> Image:
     """
     Generate an inner filled basemaps echo image with two valid channel color
     that has remove image scale small echo groups. This image is useful for latter analysis
@@ -368,7 +360,7 @@ def get_base_echo_img(layer_model, radar_img_size, mode):
     return base_img
 
 
-def base_echo_fill(gray_img, layer_model_len, mode):
+def base_echo_fill(gray_img: Image, layer_model_len: int, mode: str) -> Image:
     """
     Analise all basemaps echo groups and fill them basemaps on the valid surrounding echo values
     when surrounded ratio exceed threshold. The filling color is one valid channel RGB color.

@@ -1,5 +1,4 @@
 from PIL import Image, ImageDraw
-import os
 import time
 from tqdm import tqdm
 import random
@@ -7,56 +6,53 @@ from colorama import Fore, Style
 from MesoDetect.DataIO.consts import (NEED_COVER_BOUNDARY_STATIONS, BASEMAP_IMG_PATH,
                                       GRAY_SCALE_UNIT, NARROW_SURROUNDING_OFFSETS, CURRENT_DEBUG_RESULT_FOLDER)
 from MesoDetect.DataIO import radar_config
-
+from MesoDetect.DataIO.folder_utils import check_output_folder
+from pathlib import Path
+from typing import Optional
 
 
 def radar_image_preprocess(
-        img_path: str,
+        img_path: Path,
         station_num: str,
-        enable_debug: bool = False,
-        image_debug_folder_path: str = ""
-):
+        output_path: Path,
+        enable_debug: bool = False
+) -> Optional[Image]:
     """
     Generating a gray scale image as internal representation of input radar image.
     Args:
         img_path: path of input original radar image.
         station_num: station number in string type.
         enable_debug: boolean flat that indicates whether debug mode is enabled.
-        image_debug_folder_path: images folder path.
+        output_path: folder path for output images
 
     Returns:
         Gray scale image in PIL.Image format if successful.
         None otherwise.
     """
     print("[Info] Start preprocessing radar image...")
-    # Check debug result folder if enable debug mode
-    if enable_debug and image_debug_folder_path == "":
-        print(Fore.RED + "[Error] There is a conflict in given argument for `get_gray_img` "
-              "with image_debug_folder_path: {image_debug_folder_path} and enable_debug: {enable_debug}." + Style.RESET_ALL)
-        print(Fore.RED + "[Error] Radar image preprocessing failed." + Style.RESET_ALL)
-        return None
-
+    # Generate debug folder for current module process if enable debug mode
+    debug_output_path = output_path
+    if enable_debug:
+        debug_output_path = check_output_folder(output_path, CURRENT_DEBUG_RESULT_FOLDER)
     # Read radar data
     try:
-        read_result_img = read_radar_image(img_path, station_num, enable_debug, image_debug_folder_path)
+        read_result_img = read_radar_image(img_path, station_num, debug_output_path, enable_debug)
     except Exception as e:
         print(Fore.RED + f"[Error] Exception: {e} raised when reading radar image." + Style.RESET_ALL)
-        print(Fore.RED + "[Error] Radar image preprocessing failed." + Style.RESET_ALL)
         return None
 
     # Fill radar data
     try:
-        filled_img = narrow_fill(read_result_img, enable_debug, image_debug_folder_path)
+        filled_img = narrow_fill(read_result_img, debug_output_path, enable_debug)
     except Exception as e:
         print(Fore.RED + f"[Error] Exception: {e} raised when executing narrow filling." + Style.RESET_ALL)
-        print(Fore.RED + "[Error] Radar image preprocessing failed." + Style.RESET_ALL)
         return None
 
     print("[Info] Radar image preprocessing complete.")
     return filled_img
 
 
-def read_radar_image(radar_img_path, station_num: str, enable_debug: bool = False, image_debug_folder_path: str = "") -> Image:
+def read_radar_image(radar_img_path: Path, station_num: str, image_debug_folder_path: Path, enable_debug: bool = False) -> Image:
     """
     Generating a gray image from the original radar image
     so that later process can basemaps on this gray image
@@ -68,13 +64,6 @@ def read_radar_image(radar_img_path, station_num: str, enable_debug: bool = Fals
     """
     start = time.time()
     print("[Info] Start processing radar data...")
-    # Check debug result folder existence
-    # Initialize empty folder path
-    current_debug_folder_path = ""
-    if enable_debug and image_debug_folder_path != "":
-        current_debug_folder_path = image_debug_folder_path + CURRENT_DEBUG_RESULT_FOLDER
-        if not os.path.exists(current_debug_folder_path):
-            os.makedirs(current_debug_folder_path)
 
     # Open radar image
     radar_img = Image.open(radar_img_path)
@@ -92,9 +81,8 @@ def read_radar_image(radar_img_path, station_num: str, enable_debug: bool = Fals
                     coverage_draw.point((x, y), (0, 0, 0))
 
         # Debug process
-        if enable_debug and current_debug_folder_path != "":
-            coverage_debug_img_path = current_debug_folder_path + "boundary_coverage.png"
-            radar_img.save(coverage_debug_img_path)
+        if enable_debug:
+            radar_img.save(image_debug_folder_path / "boundary_coverage.png")
 
     # Result images
     gray_img = Image.new("RGB", radar_img.size, (0, 0, 0))
@@ -117,10 +105,9 @@ def read_radar_image(radar_img_path, station_num: str, enable_debug: bool = Fals
                     gray_draw.point((x, y), (gray_value, gray_value, gray_value))
                     read_debug_draw.point((x, y), cv_pairs[idx][0])
 
-    if enable_debug and current_debug_folder_path != "":
-        read_result_path = current_debug_folder_path + "original_gray.png"
-        gray_img.save(read_result_path)
-        read_debug_img.save(current_debug_folder_path + "read_debug.png")
+    if enable_debug:
+        gray_img.save(image_debug_folder_path / "original_gray.png")
+        read_debug_img.save(image_debug_folder_path / "read_debug.png")
 
     end = time.time()
     duration = end - start
@@ -128,7 +115,7 @@ def read_radar_image(radar_img_path, station_num: str, enable_debug: bool = Fals
     return gray_img
 
 
-def narrow_fill(gray_img: Image, enable_debug: bool = False, image_debug_folder_path: str = "") -> Image:
+def narrow_fill(gray_img: Image, image_debug_folder_path: Path, enable_debug: bool = False) -> Image:
     start = time.time()
     print("[Info] Start filling radar image...")
 
@@ -243,14 +230,11 @@ def narrow_fill(gray_img: Image, enable_debug: bool = False, image_debug_folder_
                 pbar.update(1)
 
 
-    if enable_debug and image_debug_folder_path != "":
-        current_debug_folder_path = image_debug_folder_path + CURRENT_DEBUG_RESULT_FOLDER
-        if not os.path.exists(current_debug_folder_path):
-            os.makedirs(current_debug_folder_path)
-        simple_fill_img.save(current_debug_folder_path + "simple_filled.png")
-        complex_fill_img.save(current_debug_folder_path + "complex_filled.png")
-        only_filled_img.save(current_debug_folder_path + "only_filled.png")
-        filled_img.save(current_debug_folder_path + "filled.png")
+    if enable_debug:
+        simple_fill_img.save(image_debug_folder_path / "simple_filled.png")
+        complex_fill_img.save(image_debug_folder_path / "complex_filled.png")
+        only_filled_img.save(image_debug_folder_path / "only_filled.png")
+        filled_img.save(image_debug_folder_path / "filled.png")
     end = time.time()
     duration = end - start
     print(f"[Info] Duration of radar filling: {duration:.4f} seconds")

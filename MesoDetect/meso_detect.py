@@ -1,113 +1,86 @@
-import os
 import time
-from MesoDetect.DataIO import radar_config
+from MesoDetect.DataIO.radar_config import validate_station_number, detection_setup
 from colorama import Fore, Style
 from MesoDetect.DataIO.preprocessor import radar_image_preprocess
 from MesoDetect.RadarDenoise.denoise import radar_denoise
-from MesoDetect.DataIO.data_transformer import visualize_result
-import re
+from MesoDetect.DataIO.data_transformer import visualize_result, pack_detection_result
+from MesoDetect.ImmerseSimulation.peak_detector import get_extrema_regions
+from MesoDetect.MesocycloneAnalysis.meso_analysis import opposite_extrema_analysis
+from typing import Union
+from pathlib import Path
 
 """
-Currently the this interface return a image in PIL.Image when execution is correct,
-While in final design the interface will return a meso detect result data structure.
+    input path(including folder path and file path) handling:
+    user can provide path format from different OS or use Python Path
+    project will process these paths. Internal representation use the Linux string format (.as_poxis())
+    and when need to join path with a directory then still convert to Python Path so that no need to check "/"
+    at the end of the path
+    File path:
+        User either provide a string type of valid file path (window format or linux format) or Python Pathlib Path
+        Program will convert the path to Python Pathlib Path as internal representation, which is convenient to join file name
+        or directory and save output image.
+        Extracting key info from image name, first convert the path from Python Pathlib Path into string then use string
+        process function
 """
+
 def meso_detect(
-        img_path: str,
-        output_folder_path: str,
+        img_path: Union[str, Path],
+        output_folder_path: Union[str, Path],
         station_num: str = "",
         enable_default_config: bool = True,
         enable_debug_mode: bool = False
 ):
     start = time.time()
     print("----------------------------------")
+    print(f"[Debug] Original Image path: {img_path}.")
 
-    station_num = validate_station_number(station_num, img_path)
-    if station_num is None:
+    # Check station number, extract image name from resolved image path and get the resolved path
+    validation_result = validate_station_number(station_num, img_path)
+    if validation_result is None:
+        print(Fore.RED + "[Error] Station number check failed." + Style.RESET_ALL)
         return None
+    # Extract station number and resolved image path when executing successfully
+    station_num, resolved_img_path = validation_result
+    print(f"[Debug] Resolve Image path: {resolved_img_path}")
 
-    # Detection setup
-    debug_folder_path = detection_setup(img_path, output_folder_path,
-                                        enable_default_config, enable_debug_mode)
-    if debug_folder_path is None:
+    # Generate radar image configration data and check output folder path
+    output_path = detection_setup(resolved_img_path, output_folder_path, enable_default_config)
+    if output_path is None:
         return None
+    print(f"[Debug] Output path: {output_path}")
 
     # Get gray image
-    gray_img = radar_image_preprocess(img_path, station_num, enable_debug_mode, debug_folder_path)
+    gray_img = radar_image_preprocess(resolved_img_path, station_num, output_path, enable_debug_mode)
     if gray_img is None:
+        print(Fore.RED + "[Error] Radar image preprocessing failed." + Style.RESET_ALL)
         return None
 
     # Get denoised image
-    _, _, _, unfold_img = radar_denoise(gray_img, enable_debug_mode, debug_folder_path)
+    unfold_img = radar_denoise(gray_img, output_path, enable_debug_mode)
+    if unfold_img is None:
+        print(Fore.RED + "[Error] Radar denoise process failed." + Style.RESET_ALL)
+        return None
 
-    visualize_result(debug_folder_path, unfold_img, "unfold")
+    if enable_debug_mode:
+        visualize_result(output_path, unfold_img, "unfold")
+
+    immerse_simulation_result = get_extrema_regions(unfold_img, output_path, enable_debug_mode)
+    if immerse_simulation_result is None:
+        print(Fore.RED + "[Error] Immerse simulation process failed." + Style.RESET_ALL)
+        return None
+
+    neg_extrema_regions, pos_extrema_regions = immerse_simulation_result
+
+    mesocyclone_list = opposite_extrema_analysis(unfold_img, neg_extrema_regions, pos_extrema_regions, output_path, enable_debug_mode)
+    if mesocyclone_list is None:
+        print(Fore.RED + "[Error] Mesocyclone analysis process failed." + Style.RESET_ALL)
+        return None
+
+    detection_result = pack_detection_result(station_num, resolved_img_path, unfold_img, mesocyclone_list, output_path)
+    detection_results = [detection_result]
 
     end = time.time()
     duration = end - start
     print(f"[Info] Final duration of execution: {duration:.4f} seconds")
-    return gray_img
+    return detection_results
 
-
-def validate_station_number(station_number: str, image_path: str):
-    """
-    Validating input station number, if empty then try to extract it from radar image name
-    with default format.
-    Args:
-        station_number: station number string
-        image_path: image path in string type
-
-    Returns: station number if pass validation, None otherwise.
-
-    """
-    # Station number validation
-    # Check default station number from image name
-    if station_number == "":
-        # Default image name format: Z_RADR_I_Z9755_202404301154_P_DOR_SAD_V_5_115_15.755.png
-        station_number = image_path.split("/")[-1].split("_")[3]
-        print(f"[Info] Default station number from image path: {station_number}.")
-
-    # Check station number format
-    if not bool(re.fullmatch(r'Z\d{4}', station_number)):
-        print(Fore.RED + f"[Error] Invalid station number: {station_number}." + Style.RESET_ALL)
-        print(Fore.RED + "[Error] Detection setup failed." + Style.RESET_ALL)
-        return None
-    return station_number
-
-
-def detection_setup(img_path: str, output_folder_path: str, enable_default_config: bool = True, enable_debug_mode: bool = False):
-    """
-    Setting up mesocyclone detection configration.
-    Args:
-        img_path: path of radar image.
-        output_folder_path: path of output folder.
-        enable_default_config: boolean flat indicates if default config is enabled.
-        enable_debug_mode: boolean flat indicates if debug mode is enabled.
-
-    Returns:
-        debug folder path if setup succeed.
-        None if setup failed.
-    """
-    print("[Info] Start detection setup...")
-    print(f"[Info] Input image path: {img_path}.")
-
-    if enable_debug_mode:
-        # Extract image name
-        img_name = img_path.split("/")[-1].split(".")[0]
-        print(f"[Debug] Image name: {img_name}.")
-        # Get result folder path
-        debug_images_folder_path = output_folder_path + img_name + "/"
-        if not os.path.exists(debug_images_folder_path):
-            os.makedirs(debug_images_folder_path)
-    else:
-        # Empty path indicate that debug mode is disabled
-        debug_images_folder_path = ""
-
-    print(f"[Info] Detection result image folder path: {debug_images_folder_path}.")
-
-    # Set up radar image config
-    setup_result = radar_config.setup_radar_img_config(img_path, False, enable_default_config)
-    if not setup_result:
-        print(Fore.RED + "[Error] Detection setup failed." + Style.RESET_ALL)
-        return None
-
-    print("[Info] Detection setup complete.")
-    return debug_images_folder_path

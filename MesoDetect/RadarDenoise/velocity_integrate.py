@@ -2,6 +2,7 @@ from PIL import Image, ImageDraw
 from MesoDetect.DataIO.consts import GRAY_SCALE_UNIT, SURROUNDING_OFFSETS
 from MesoDetect.RadarDenoise import dependencies, consts
 from MesoDetect.DataIO.radar_config import get_radar_info, get_color_bar_info
+from pathlib import Path
 """
 crossed echo groups:
     1. small groups:
@@ -18,7 +19,7 @@ crossed echo groups:
 """
     Interface: integrate_velocity_mode
 """
-def integrate_velocity_mode(neg_img, pos_img, enable_debug, debug_result_folder=""):
+def integrate_velocity_mode(neg_img: Image, pos_img: Image, enable_debug: bool, debug_result_folder: Path) -> Image:
     """
     Integrate neg and pos velocity mode denoise result image into complete radar image
     Args:
@@ -30,6 +31,7 @@ def integrate_velocity_mode(neg_img, pos_img, enable_debug, debug_result_folder=
     Returns:
     PIL Image object of integrated image
     """
+    print("[Info] Start integrating two velocity mode images...")
     # Create a integration result image
     integrate_img = Image.new("RGB", neg_img.size, (0, 0, 0))
 
@@ -235,14 +237,14 @@ def integrate_velocity_mode(neg_img, pos_img, enable_debug, debug_result_folder=
                         surrounding_debug_draw.point(coord, echo_value)
 
     if enable_debug:
-        surrounding_debug_img.save(debug_result_folder + "surrounding_fill.png")
-        integrate_img_path = debug_result_folder + "denoised_integrate.png"
-        integrate_img.save(integrate_img_path)
+        surrounding_debug_img.save(debug_result_folder / "surrounding_fill.png")
+        integrate_img.save(debug_result_folder / "denoised_integrate.png")
 
+    print("[Info] Velocity integration success.")
     return integrate_img
 
 
-def get_crossed_echo_groups(neg_img, pos_img, integrate_img, enable_debug, debug_result_folder=""):
+def get_crossed_echo_groups(neg_img: Image, pos_img: Image, integrate_img: Image, enable_debug: bool, debug_result_folder: Path):
     integrate_draw = ImageDraw.Draw(integrate_img)
     # Iterate through both neg and pos image to get uncrossed echoes
     radar_zone = get_radar_info("radar_zone")
@@ -269,7 +271,7 @@ def get_crossed_echo_groups(neg_img, pos_img, integrate_img, enable_debug, debug
     for echo_coordinate in crossed_echoes:
         refer_draw.point(echo_coordinate, consts.REFER_IMG_COLOR)
     if enable_debug:
-        refer_img.save(debug_result_folder + "crossed_refer.png")
+        refer_img.save(debug_result_folder / "crossed_refer.png")
 
     # Get crossed echo groups
     crossed_groups = dependencies.get_echo_groups(refer_img, crossed_echoes)

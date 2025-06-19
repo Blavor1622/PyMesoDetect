@@ -1,28 +1,30 @@
 import numpy as np
 from sklearn.decomposition import PCA
-from MesoDetect.ReadData.utils import gray_value_interval
-from MesoDetect.ReadData.utils import surrounding_offsets
-"""
-Definition of thresholds: area, narrow degree, average volume and density degree
-"""
-AREA_MINIMUM_THRESHOLD = 10
-AREA_MAXIMUM_THRESHOLD = 135
-NARROW_MAXIMUM_THRESHOLD = 4.25
-AVG_VOLUME_MINIMUM_THRESHOLD = 2.25
-DENSITY_MAXIMUM_THRESHOLD = 75
-LAYER_GROUP_MAXIMUM_THRESHOLD = 1.75
-
-neighbour_offsets = [(0, -1), (0, 1), (-1, 0), (1, 0), (-1, -1), (-1, 1), (1, -1), (1, 1)]
+from MesoDetect.DataIO.consts import GRAY_SCALE_UNIT, SURROUNDING_OFFSETS
+from MesoDetect.ImmerseSimulation.consts import (AREA_MAXIMUM_THRESHOLD, AREA_MINIMUM_THRESHOLD,
+                                                 AVG_VOLUME_MINIMUM_THRESHOLD, NARROW_MAXIMUM_THRESHOLD,
+                                                 DENSITY_MAXIMUM_THRESHOLD, LAYER_GROUP_MAXIMUM_THRESHOLD)
+from MesoDetect.RadarDenoise.dependencies import get_echo_groups
 
 
-def check_group_condition(echo_group, refer_img, layer_model_len):
+def check_region_attributes(echo_group, refer_img, layer_model_len):
+    """
+        Check given echo group fulfill the extrema region attribution constraints or not.
+    Args:
+        echo_group: list of echo coordinates that belongs to a connected component of echos
+        refer_img: the image that contains the next-to relationship of echo coordinates in echo_group
+        layer_model_len: len of layer model, also equal to the len of radar velocity color legend
+
+    Returns:
+        True if the given echo group fulfills the constraints, False otherwise.
+    """
     # Check velocity mode of the group
     if len(echo_group) == 0:
         return False
     # Calculate velocity mode of the group
     group_instance = echo_group[0]
     group_instance_value = refer_img.getpixel(group_instance)
-    group_instance_index = round(group_instance_value[0] / gray_value_interval) - 1
+    group_instance_index = round(group_instance_value[0] / GRAY_SCALE_UNIT) - 1
     half_len = round(layer_model_len / 2)
     if group_instance_index <= half_len - 1:
         is_neg = True
@@ -38,7 +40,7 @@ def check_group_condition(echo_group, refer_img, layer_model_len):
     volume = 0
     for echo_coord in echo_group:
         echo_value = refer_img.getpixel(echo_coord)
-        echo_index = round(echo_value[0] / gray_value_interval) - 1
+        echo_index = round(echo_value[0] / GRAY_SCALE_UNIT) - 1
         if is_neg:
             volume += half_len - echo_index
         else:
@@ -69,7 +71,7 @@ def check_group_condition(echo_group, refer_img, layer_model_len):
     surroundings = set()
     for echo_coord in echo_group:
         # Check neighbour for each pixel
-        for offset in surrounding_offsets:
+        for offset in SURROUNDING_OFFSETS:
             neighbour_coord = (echo_coord[0] + offset[0], echo_coord[1] + offset[1])
             # Filter out inner pixel
             if neighbour_coord not in echo_group:
@@ -92,7 +94,7 @@ def check_group_condition(echo_group, refer_img, layer_model_len):
     for echo_coord in echo_group:
         # Get pixel value
         echo_value = refer_img.getpixel(echo_coord)
-        echo_index = round(echo_value[0] / gray_value_interval) - 1
+        echo_index = round(echo_value[0] / GRAY_SCALE_UNIT) - 1
         if echo_index in range(layer_model_len):
             group_layer_model[echo_index].append(echo_coord)
     # Group each layer
@@ -115,43 +117,3 @@ def check_group_condition(echo_group, refer_img, layer_model_len):
         return False
     else:
         return True
-
-
-def get_echo_groups(refer_img, coordinate_list):
-    """
-    a utility function that divides the given coordinate_list
-    and then return a list of connected components
-    :param refer_img: a Pillow Image object that used for checking connected relationship of echoes
-    :param coordinate_list: list of coordinate that might have several connected component
-    :return: a list of connected components
-    """
-    if len(coordinate_list) == 0:
-        return [[]]
-
-    # Extract gray value index of current point
-    target_value = refer_img.getpixel(coordinate_list[0])[0]
-    target_index = round(1.0 * target_value / gray_value_interval) - 1
-
-    components = []
-    visited = set()
-    for point in coordinate_list:
-        if point not in visited:
-            visited.add(point)
-            stack = [point]
-            component = [point]
-            while stack:
-                current_point = stack.pop()
-                # get surrounding pixel values
-                for offset in neighbour_offsets:
-                    # ger neighbour pixel coordinate
-                    neighbour = (current_point[0] + offset[0], current_point[1] + offset[1])
-                    neighbour_value = refer_img.getpixel(neighbour)[0]
-                    if round(neighbour_value * 1.0 / gray_value_interval) - 1 == target_index:
-                        # Mean that neighbour value similar to target value (slight difference is allowed)
-                        if neighbour not in visited:
-                            visited.add(neighbour)
-                            component.append(neighbour)
-                            stack.append(neighbour)
-            components.append(component)
-
-    return components

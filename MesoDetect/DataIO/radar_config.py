@@ -2,11 +2,77 @@ from PIL import Image
 import math
 from colorama import Fore, Style
 import yaml
+import re
 import os
 from MesoDetect.DataIO.consts import CONFIG_FILE, VALID_IMG_EXTENSION
+from MesoDetect.DataIO.folder_utils import check_output_folder
+from typing import Union, Optional, Tuple
+from pathlib import Path
+
+""" interface for radar image configration data setting up """
+def validate_station_number(station_number: str, image_path: Union[Path, str]) -> Optional[Tuple[str, Path]]:
+    """
+    Validating input station number, if empty then try to extract it from radar image name
+    with default format.
+    Args:
+        station_number: station number string
+        image_path: image path in string type
+
+    Returns: station number if pass validation, None otherwise.
+
+    """
+    # resolve image path
+    resolved_image_path = Path(image_path).expanduser().resolve()
+    # Station number validation
+    # Check default station number from image name
+    if station_number == "":
+        # Default image name format: Z_RADR_I_Z9755_202404301154_P_DOR_SAD_V_5_115_15.755.png
+        station_number = resolved_image_path.as_posix().split("/")[-1].split("_")[3]
+        print(f"[Info] Default station number from image path: {station_number}.")
+
+    # Check station number format
+    if not bool(re.fullmatch(r'Z\d{4}', station_number)):
+        print(Fore.RED + f"[Error] Invalid station number: {station_number}." + Style.RESET_ALL)
+        return None
+    return station_number, resolved_image_path
 
 
-""" this is interface for radar image configration data setting up """
+def detection_setup(img_path: Path, output_folder_path: Union[str, Path], enable_default_config: bool = True) -> Optional[Path]:
+    """
+    Setting up mesocyclone detection configration.
+    Args:
+        img_path: path of radar image.
+        output_folder_path: path of output folder.
+        enable_default_config: boolean flat indicates if default config is enabled.
+
+    Returns:
+        debug folder path if setup succeed.
+        None if setup failed.
+    """
+    print("[Info] Start detection setup...")
+    print(f"[Info] Input image path: {img_path}.")
+
+    # Extract image name
+    img_name = img_path.as_posix().split("/")[-1].split(".")[0]
+    print(f"[Debug] Image name: {img_name}.")
+
+    process_result_folder_name = img_name
+    current_output_path = check_output_folder(output_folder_path, process_result_folder_name)
+    if current_output_path is None:
+        print(Fore.RED + "[Error] Check output folder failed." + Style.RESET_ALL)
+        return None
+    print(f"[Info] Detection result image folder path: {current_output_path}.")
+
+    # Set up radar image config
+    setup_result = setup_radar_img_config(img_path.as_posix(), False, enable_default_config)
+    if not setup_result:
+        print(Fore.RED + "[Error] Radar image configration data set up failed." + Style.RESET_ALL)
+        return None
+
+    print("[Info] Detection setup complete.")
+    return current_output_path
+
+
 def setup_radar_img_config(
         data_path: str,
         is_folder: bool = False,
@@ -30,20 +96,20 @@ def setup_radar_img_config(
         # Check folder data
         sample_img_path = check_input_folder(data_path)
         if sample_img_path is None:
-            print(Fore.RED + "[Error] Radar image config data setup failed." + Style.RESET_ALL)
+            print(Fore.RED + "[Error] Input folder check failed." + Style.RESET_ALL)
             return False
 
     # From parameter decide whether to update default image config data or not
     if enable_default_config:
         write_result = write_default_config(sample_img_path)
         if not write_result:
-            print(Fore.RED + "[Error] Radar image config data setup failed." + Style.RESET_ALL)
+            print(Fore.RED + "[Error] Writing default configration data failed." + Style.RESET_ALL)
             return False
 
     # Validate config file
     validation_result = validate_radar_config()
     if not validation_result:
-        print(Fore.RED + "[Error] Radar image config data setup failed." + Style.RESET_ALL)
+        print(Fore.RED + "[Error] Validating radar image configration data failed." + Style.RESET_ALL)
         return False
     print("[Info] Radar image config data setup complete.")
     return True
