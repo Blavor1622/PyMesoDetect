@@ -3,12 +3,12 @@ from colorama import Fore, Style
 import time
 import copy
 from MesoDetect.DataIO.consts import GRAY_SCALE_UNIT, SURROUNDING_OFFSETS
-from MesoDetect.DataIO.radar_config import get_color_bar_info
+from MesoDetect.DataIO.utils import get_color_bar_info
 from MesoDetect.ImmerseSimulation.consts import AREA_MAXIMUM_THRESHOLD
 from MesoDetect.ImmerseSimulation.region_filter import check_region_attributes
 from MesoDetect.RadarDenoise.dependencies import get_layer_model
 from MesoDetect.ImmerseSimulation.consts import CURRENT_DEBUG_RESULT_FOLDER
-from MesoDetect.DataIO.folder_utils import check_output_folder
+from MesoDetect.DataIO.utils import check_output_folder
 from typing import List, Tuple, Optional
 from pathlib import Path
 

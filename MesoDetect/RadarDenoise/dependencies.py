@@ -1,7 +1,7 @@
 from PIL import Image
 import numpy as np
 from skimage.segmentation import flood_fill
-from MesoDetect.DataIO.radar_config import get_radar_info, get_color_bar_info
+from MesoDetect.DataIO.utils import get_radar_info, get_color_bar_info
 from MesoDetect.DataIO.consts import GRAY_SCALE_UNIT, SURROUNDING_OFFSETS
 from typing import List, Tuple, Optional
 

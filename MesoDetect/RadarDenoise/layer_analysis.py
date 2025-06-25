@@ -1,7 +1,7 @@
 from PIL import Image, ImageDraw
 from MesoDetect.RadarDenoise import dependencies, consts
 from MesoDetect.DataIO.consts import GRAY_SCALE_UNIT, SURROUNDING_OFFSETS
-from MesoDetect.DataIO.radar_config import get_color_bar_info, get_radar_info
+from MesoDetect.DataIO.utils import get_color_bar_info, get_radar_info
 from typing import List, Tuple
 from pathlib import Path
 

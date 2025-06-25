@@ -1,7 +1,7 @@
 from PIL import Image, ImageDraw
 from MesoDetect.DataIO.consts import GRAY_SCALE_UNIT, SURROUNDING_OFFSETS
 from MesoDetect.RadarDenoise import dependencies, consts
-from MesoDetect.DataIO.radar_config import get_radar_info, get_color_bar_info
+from MesoDetect.DataIO.utils import get_radar_info, get_color_bar_info
 from pathlib import Path
 """
 crossed echo groups:

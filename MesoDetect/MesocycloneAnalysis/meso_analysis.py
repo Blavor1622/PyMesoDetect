@@ -1,11 +1,10 @@
 import math
 import time
-from MesoDetect.DataIO.radar_config import get_color_bar_info
+from MesoDetect.DataIO.utils import get_color_bar_info, get_radar_info
 from MesoDetect.DataIO.consts import GRAY_SCALE_UNIT
-from MesoDetect.DataIO.radar_config import get_radar_info
 from typing import List, Tuple, Optional
 from pathlib import Path
-from MesoDetect.DataIO.folder_utils import check_output_folder
+from MesoDetect.DataIO.utils import check_output_folder
 from colorama import Fore, Style
 from PIL import Image, ImageDraw
 from MesoDetect.ImmerseSimulation.peak_detector import draw_extrema_regions
@@ -179,6 +178,7 @@ def validate_potential_meso(
                         if logic_center_x - radar_center[0] < 0:
                             theta_degrees = 360 - theta_degrees
                         mesocyclone_data: MesocycloneInfo = {
+                            "storm_num": 0,
                             "logic_center": (logic_center_x, logic_center_y),
                             "radar_distance": radar_center_distance,
                             "radar_angle": theta_degrees,
@@ -189,6 +189,10 @@ def validate_potential_meso(
                             "pos_max_velocity": maximum_pos_velocity,
                         }
                         mesocyclone_list.append(mesocyclone_data)
+
+    # Iterate through mesocyclone data list and add storm number
+    for storm_index, meso_info in enumerate(mesocyclone_list):
+        meso_info["storm_num"] = storm_index
 
     return mesocyclone_list
 

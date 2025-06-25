@@ -2,7 +2,7 @@ from PIL import Image
 import time
 from colorama import Fore, Style
 from MesoDetect.RadarDenoise import layer_analysis, dependencies, velocity_integrate, velocity_unfold
-from MesoDetect.DataIO.folder_utils import check_output_folder
+from MesoDetect.DataIO.utils import check_output_folder
 from MesoDetect.RadarDenoise.consts import CURRENT_DEBUG_RESULT_FOLDER
 from pathlib import Path
 from typing import Optional

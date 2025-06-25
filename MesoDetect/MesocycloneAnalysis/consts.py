@@ -1,6 +1,7 @@
 from typing import Tuple, TypedDict
 
 class MesocycloneInfo(TypedDict):
+    storm_num: int
     logic_center: Tuple[int, int]
     radar_distance: float
     radar_angle: float

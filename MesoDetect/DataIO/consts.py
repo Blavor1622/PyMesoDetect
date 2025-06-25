@@ -1,10 +1,11 @@
 """
-    This file defines constant data that are used in radar image process algorithm,
-    radar image config data are not within this scope
+This file defines constant data that are used in radar image process algorithm,
+radar image config data are not within this scope
 """
 from pathlib import Path
 from MesoDetect.MesocycloneAnalysis.consts import MesocycloneInfo
 from typing import TypedDict, List
+from datetime import datetime
 
 
 # List of valid image extension
@@ -26,7 +27,7 @@ GRAY_SCALE_UNIT = 17
 BASEMAP_IMG_PATH = (Path(__file__).parent.parent.parent / "data/basemaps").as_posix() + "/"
 
 # Default radar image config file path
-CONFIG_FILE = (Path(__file__).parent.parent.parent / "MesoDetect/DataIO/radar_config.yaml").as_posix()
+CONFIG_FILE = (Path(__file__).parent.parent.parent / "data/radar_config.yaml").as_posix()
 
 # Default debug image folder name
 CURRENT_DEBUG_RESULT_FOLDER = "DataIO/"
@@ -34,6 +35,6 @@ CURRENT_DEBUG_RESULT_FOLDER = "DataIO/"
 # Define detection result data dictionary
 class DetectionResult(TypedDict):
     station_number: str
-    scan_time: str
+    scan_time: datetime
     meso_list: List[MesocycloneInfo]
     result_img_paths: List[str]

@@ -1,4 +1,0 @@
-work flow of DataIO:
-1. setup radar config data
-2. read radar data based on config data
-3. preprocess radar data and generate a internal expression image

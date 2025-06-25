@@ -1,3 +1,7 @@
+"""
+This file implements the logic of preprocess orignal radar image,
+including turning into grayscale image and executing narrow filling.
+"""
 from PIL import Image, ImageDraw
 import time
 from tqdm import tqdm
@@ -5,12 +9,15 @@ import random
 from colorama import Fore, Style
 from MesoDetect.DataIO.consts import (NEED_COVER_BOUNDARY_STATIONS, BASEMAP_IMG_PATH,
                                       GRAY_SCALE_UNIT, NARROW_SURROUNDING_OFFSETS, CURRENT_DEBUG_RESULT_FOLDER)
-from MesoDetect.DataIO import radar_config
-from MesoDetect.DataIO.folder_utils import check_output_folder
+from MesoDetect.DataIO import utils
+from MesoDetect.DataIO.utils import check_output_folder
 from pathlib import Path
 from typing import Optional
 
 
+"""
+Public Interface: preprocess original radar image
+"""
 def radar_image_preprocess(
         img_path: Path,
         station_num: str,
@@ -18,7 +25,8 @@ def radar_image_preprocess(
         enable_debug: bool = False
 ) -> Optional[Image]:
     """
-    Generating a gray scale image as internal representation of input radar image.
+    Generates a gray scale image as internal representation of input radar image
+    and executes narrow for the gray scale image.
     Args:
         img_path: path of input original radar image.
         station_num: station number in string type.
@@ -52,15 +60,20 @@ def radar_image_preprocess(
     return filled_img
 
 
+"""
+Logic implementation Function: read original radar image and convert to gray scale image
+"""
 def read_radar_image(radar_img_path: Path, station_num: str, image_debug_folder_path: Path, enable_debug: bool = False) -> Image:
     """
-    Generating a gray image from the original radar image
-    so that later process can basemaps on this gray image
-    :param radar_img_path: path of original radar image
-    :param station_num: string value of the original radar station number with format "Zxxxx"
-    :param enable_debug: boolean flag for deciding whether to enable debug mode
-    :param image_debug_folder_path: path of debug result folder for each radar image
-    :return: path of gray image if generation is success
+    Generates a gray image from the original radar image so that later process can basemaps on this gray image
+    Args:
+        radar_img_path: original radar image path
+        station_num: radar station number for boundary replacement check
+        image_debug_folder_path: debug output folder path
+        enable_debug: flag of whether to enable debug mode or not
+
+    Returns:
+        path of gray scale image if execution success.
     """
     start = time.time()
     print("[Info] Start processing radar data...")
@@ -91,8 +104,8 @@ def read_radar_image(radar_img_path: Path, station_num: str, image_debug_folder_
     read_debug_draw = ImageDraw.Draw(read_debug_img)
 
     # Iterate the radar zone to read echo data
-    radar_zone = radar_config.get_radar_info("radar_zone")
-    cv_pairs = radar_config.get_color_bar_info("color_velocity_pairs")
+    radar_zone = utils.get_radar_info("radar_zone")
+    cv_pairs = utils.get_color_bar_info("color_velocity_pairs")
     for x in range(radar_zone[0], radar_zone[1]):
         for y in range(radar_zone[0], radar_zone[1]):
             # Get current pixel value
@@ -115,7 +128,22 @@ def read_radar_image(radar_img_path: Path, station_num: str, image_debug_folder_
     return gray_img
 
 
+"""
+Logic Implementation Function: narrow filling process 
+for original gray scale image after reading from original radar image
+"""
 def narrow_fill(gray_img: Image, image_debug_folder_path: Path, enable_debug: bool = False) -> Image:
+    """
+    Executes narrow filling process for gray scale radar image, filling small gaps caused by original radar image
+    region boundaries and region name marks.
+    Args:
+        gray_img: gray scale image
+        image_debug_folder_path: debug output folder path
+        enable_debug: flag of whether to enable debug mode or not
+
+    Returns:
+        filled gray scale image
+    """
     start = time.time()
     print("[Info] Start filling radar image...")
 
@@ -132,8 +160,8 @@ def narrow_fill(gray_img: Image, image_debug_folder_path: Path, enable_debug: bo
     only_fill_draw = ImageDraw.Draw(only_filled_img)
 
     # Get const values
-    radar_zone = radar_config.get_radar_info("radar_zone")
-    align_const = (1 + len(radar_config.get_color_bar_info("color_velocity_pairs"))) * 1.0 / 2
+    radar_zone = utils.get_radar_info("radar_zone")
+    align_const = (1 + len(utils.get_color_bar_info("color_velocity_pairs"))) * 1.0 / 2
     gray_value_interval = GRAY_SCALE_UNIT
 
     # Iterate radar zone
