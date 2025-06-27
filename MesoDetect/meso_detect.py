@@ -6,20 +6,26 @@ from MesoDetect.RadarDenoise.denoise import radar_denoise
 from MesoDetect.DataIO.utils import visualize_result, pack_detection_result, print_detection_result
 from MesoDetect.ImmerseSimulation.peak_detector import get_extrema_regions
 from MesoDetect.MesocycloneAnalysis.meso_analysis import opposite_extrema_analysis
-from typing import Union, Optional
+from typing import Union, Optional, List
 from pathlib import Path
 from MesoDetect.DataIO.consts import DetectionResult
+from MesoDetect.DataIO.utils import get_folder_image_paths, check_output_folder
+
 
 def meso_detect(
         img_path: Union[str, Path],
         output_folder_path: Union[str, Path],
-        station_num: str = "",
-        enable_default_config: bool = True,
         enable_debug_mode: bool = False
 ) -> Optional[list[DetectionResult]]:
     start = time.time()
     print("----------------------------------")
+    print("[Info] Start Mesocyclone detection.")
     print(f"[Info] Original Image path: {img_path}.")
+
+    # Current project version only allow default config radar image data
+    enable_default_config: bool = True
+    # And extract station numbe from formatted image name
+    station_num: str = ""
 
     setup_result = setup_config(img_path, output_folder_path, station_num, enable_default_config)
     if setup_result is None:
@@ -33,6 +39,70 @@ def meso_detect(
         return None
 
     detection_results = [detection_result]
+
+    end = time.time()
+    duration = end - start
+    print(f"[Info] Final duration of execution: {duration:.4f} seconds")
+    return detection_results
+
+
+def meso_batch_detect(
+        img_folder_path: Union[str, Path],
+        output_folder_path: Union[str, Path],
+        enable_debug_mode: bool = False
+) -> Optional[list[DetectionResult]]:
+    start = time.time()
+    print("----------------------------------")
+    print("[Info] Start mesocyclone batch detection.")
+    print(f"[Info] Original input folder path: {img_folder_path}.")
+
+    # Current project version only allow default config radar image data
+    enable_default_config: bool = True
+    # And extract station numbe from formatted image name
+    station_num: str = ""
+
+    # Get valid image paths from given input folder
+    radar_img_paths = get_folder_image_paths(img_folder_path)
+
+    # Check extraction result
+    if len(radar_img_paths) == 0:
+        print(Fore.RED + "[Error] No valid image file in given directory." + Style.RESET_ALL)
+        return None
+
+    # Get sample image for config setup
+    sample_img_path = radar_img_paths[0]
+    setup_result = setup_config(sample_img_path, output_folder_path, station_num, enable_default_config)
+
+    # Check setup result
+    if setup_result is None:
+        print(Fore.RED + "[Error] Detection config data setup failed." + Style.RESET_ALL)
+        return None
+    station_num, _, _ = setup_result
+
+    # Batch process
+    detection_results: List[DetectionResult] = []
+    for img_num, radar_img_path in enumerate(radar_img_paths, start=1):
+        print(f"---[Info] Image {img_num} Mesocyclone Detection:")
+        batch_start = time.time()
+
+        # Extract image name from image path
+        process_result_folder_name = radar_img_path.as_posix().split("/")[-1].split(".")[0]
+        # Create a folder with the extracted image name under given output directory
+        result_output_path = check_output_folder(output_folder_path, process_result_folder_name)
+        if result_output_path is None:
+            print(Fore.RED + "[Error] Create result output folder failed." + Style.RESET_ALL)
+            return None
+        print(f"[Info] Detection result image folder path: {result_output_path}.")
+
+        detection_result = detect_mesocyclone(radar_img_path, result_output_path, station_num, enable_debug_mode)
+        if detection_result is None:
+            print(Fore.RED + "[Error] Meso detection process failed." + Style.RESET_ALL)
+            return None
+        batch_end = time.time()
+        batch_duration = batch_end - batch_start
+        print(f"---[Info] Image {img_num} Mesocyclone Complete.")
+        print(f"---[Info] Duration of batch execution: {batch_duration:.4f} seconds")
+        detection_results.append(detection_result)
 
     end = time.time()
     duration = end - start
@@ -75,6 +145,7 @@ def detect_mesocyclone(
         return None
 
     detection_result = pack_detection_result(station_num, resolved_img_path, unfold_img, mesocyclone_list, output_path)
-    print_detection_result(detection_result)
+    if enable_debug_mode:
+        print_detection_result(detection_result)
 
     return detection_result

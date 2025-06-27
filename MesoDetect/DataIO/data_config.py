@@ -43,11 +43,17 @@ def setup_config(
     # Get String type image path for string process
     resolved_img_path_str = resolved_image_path.as_posix()
     print(f"[Info] Resolved image path (str): {resolved_img_path_str}")
-    # If use default station number extracted from formatted image name
-    if station_num == "":
+    # Extract image name
+    image_name = resolved_img_path_str.split("/")[-1]
+    # Check image name with default format
+    if not is_valid_image_name(image_name):
         # Default image name format: Z_RADR_I_Z9755_202404301154_P_DOR_SAD_V_5_115_15.755.png
-        station_num = resolved_img_path_str.split("/")[-1].split("_")[3]
-        print(f"[Info] Default station number from image path: {station_num}.")
+        print(Fore.RED + f"[Error] Image name validation failed." + Style.RESET_ALL)
+        return None
+    # Extract station number from image name
+    if station_num == "":
+        station_num = image_name.split("_")[3]
+        print(f"[Info] Extracted station number from image name: {station_num}.")
 
     # Check station number format
     if not bool(re.fullmatch(r'Z\d{4}', station_num)):
@@ -77,6 +83,25 @@ def setup_config(
         return None
     print("[Info] Setting up data configuration complete.")
     return station_num, resolved_image_path, result_output_path
+
+
+def is_valid_image_name(image_name: str) -> bool:
+    # Split the name into segments
+    segments = image_name.split('_')
+
+    # Check if there are enough segments (at least 5)
+    if len(segments) < 5:
+        return False
+
+    # Check the 4th segment (Z followed by exactly 4 digits)
+    if not re.fullmatch(r'Z\d{4}', segments[3]):
+        return False
+
+    # Check the 5th segment (timestamp: YYYYmmDDHHMM or YYYYmmDDHHMMss)
+    if not re.fullmatch(r'\d{12}(\d{2})?', segments[4]):
+        return False
+
+    return True
 
 
 """

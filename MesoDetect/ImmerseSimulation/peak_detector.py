@@ -109,10 +109,11 @@ def extrema_region_analysis(
     # Iterate layer model with specific index range
     immerse_img = Image.new("RGB", radar_img_size, (0, 0, 0))
     immerse_draw = ImageDraw.Draw(immerse_img)
-    peak_groups = []
+
     # items in this list have structure like (flag, echo_groups)
     # the flag is an int value that only in 0 or 1
     # echo_groups is the list of coordinates
+    peak_groups: List[Tuple[int, List[Tuple[int, int]]]] = []
     for layer_idx in layer_idx_range:
         # Calculate current layer value
         current_layer_value = (layer_idx + 1) * GRAY_SCALE_UNIT
@@ -122,115 +123,17 @@ def extrema_region_analysis(
         for echo_coord in layer_model[layer_idx]:
             immerse_draw.point(echo_coord, current_layer_color)
 
-        # Check whether is the first time or not
-        new_peak_groups = []
-        is_former_peak_added = set()
-        # First check peak groups from last layer
-        for former_peak_group_pair in peak_groups:
-            # Check the current former peak group and merge it
-            if len(former_peak_group_pair[1]) == 0:
-                # Skip empty peak group
-                continue
-            if former_peak_group_pair[0] == 1:
-                new_peak_groups.append(former_peak_group_pair)
-                continue
-            # Check whether peak group that can be extended has been visited or not
-            if former_peak_group_pair[1][0] in is_former_peak_added:
-                # Indicate that current peak group has been added into the new peak group
-                # Skip this group
-                continue
-            # copy the former group content
-            new_peak_group = copy.deepcopy(former_peak_group_pair[1])
-            is_visited = set()
-            is_exceed = False
-            for echo_coord in new_peak_group:
-                if echo_coord not in is_visited:
-                    is_visited.add(echo_coord)
-                    stack = [echo_coord]
-                    while stack:
-                        current_coord = stack.pop()
-                        for offset in SURROUNDING_OFFSETS:
-                            neighbour_coord = (current_coord[0] + offset[0], current_coord[1] + offset[1])
-                            neighbour_value = immerse_img.getpixel(neighbour_coord)
-                            neighbour_index = round(neighbour_value[0] / GRAY_SCALE_UNIT) - 1
-                            # Check neighbour index value
-                            if is_neg and 0 <= neighbour_index <= layer_idx:
-                                if neighbour_coord not in is_visited:
-                                    is_visited.add(neighbour_coord)
-                                    stack.append(neighbour_coord)
-                                    new_peak_group.append(neighbour_coord)
-                            elif not is_neg and neighbour_index >= layer_idx:
-                                if neighbour_coord not in is_visited:
-                                    is_visited.add(neighbour_coord)
-                                    stack.append(neighbour_coord)
-                                    new_peak_group.append(neighbour_coord)
-                        if len(new_peak_group) > AREA_MAXIMUM_THRESHOLD:
-                            is_exceed = True
-                            break
-            # Check whether the peak group has extended or not
-            if not is_exceed:
-                # Indicate that current peak group after extension satisfies the condition
-                # Add this group into new list
-                new_peak_groups.append((0, new_peak_group))
-                # Mark former peak group that is included in current group
-                for fpg_pair in peak_groups:
-                    # Skip peak group that has been marked terminating extension
-                    if fpg_pair[0] == 1:
-                        continue
-                    # Skip empty peak group
-                    if len(fpg_pair[1]) == 0:
-                        continue
-                    # Extract a group instance to check inclusion relationship
-                    if fpg_pair[1][0] in new_peak_group:
-                        # Indicate that current peak group also included in the new peak group
-                        for coord in fpg_pair[1]:
-                            is_former_peak_added.add(coord)
-            else:
-                for fpg_pair in peak_groups:
-                    # Skip peak group that has been marked terminating extension
-                    if fpg_pair[0] == 1:
-                        continue
-                    # Skip empty peak group
-                    if len(fpg_pair[1]) == 0:
-                        continue
-                    # Extract a group instance to check inclusion relationship
-                    if fpg_pair[1][0] in new_peak_group:
-                        # Indicate that current peak group also included in the new peak group
-                        for coord in fpg_pair[1]:
-                            is_former_peak_added.add(coord)
-                        new_peak_groups.append((1, fpg_pair[1]))
-        # Then check new layer peak groups that generated by current layer echoes
-        # Iterate current layer echoes
-        is_visited = set()
-        for echo_coord in layer_model[layer_idx]:
-            if echo_coord not in is_visited:
-                is_visited.add(echo_coord)
-                new_init_peak_group = [echo_coord]
-                stack = [echo_coord]
-                is_not_isolated = False
-                while stack:
-                    current_coord = stack.pop()
-                    for offset in SURROUNDING_OFFSETS:
-                        neighbour_coord = (current_coord[0] + offset[0], current_coord[1] + offset[1])
-                        neighbour_value = immerse_img.getpixel(neighbour_coord)
-                        neighbour_index = round(neighbour_value[0] / GRAY_SCALE_UNIT) - 1
-                        if neighbour_index == layer_idx:
-                            if neighbour_coord not in is_visited:
-                                is_visited.add(neighbour_coord)
-                                stack.append(neighbour_coord)
-                                new_init_peak_group.append(neighbour_coord)
-                        elif neighbour_index != -1:
-                            # Indicates that current group is not an isolated group
-                            is_not_isolated = True
-                # First check whether the group is isolated or not
-                if not is_not_isolated:
-                    # Check new initial peak group size with threshold
-                    # Note that here use simple condition in case too strict condition check causes over-filter
-                    if len(new_init_peak_group) <= AREA_MAXIMUM_THRESHOLD:
-                        new_peak_groups.append((0, new_init_peak_group))
+        # Extend existing region groups
+        extended_region_groups = extend_region_groups(peak_groups, layer_idx, immerse_img, is_neg)
+
+        # Get new initial region echo groups that might be extended in next iteration
+        layer_init_region_groups = get_init_regional_groups(layer_model, layer_idx, immerse_img)
+
+        # Add init region groups
+        extended_region_groups += layer_init_region_groups
 
         # Update peak group
-        peak_groups = new_peak_groups
+        peak_groups = extended_region_groups
 
         # Draw debug image if enable debug mode
         if enable_debug:
@@ -251,6 +154,92 @@ def extrema_region_analysis(
         get_region_debug_img(filtered_peak_groups, immerse_img, mode + "_peak_filtered", debug_output_path)
 
     return filtered_peak_groups
+
+
+def extend_region_groups(peak_groups: List[Tuple[int, List[Tuple[int, int]]]], layer_idx: int, immerse_img: Image, is_neg: bool)\
+        -> List[Tuple[int, List[Tuple[int, int]]]]:
+    layer_peak_groups = []
+    # First check peak groups from last layer
+    for former_peak_group_pair in peak_groups:
+        # Check the current former peak group and merge it
+        if len(former_peak_group_pair[1]) == 0:
+            # Skip empty peak group
+            continue
+        if former_peak_group_pair[0] == 1:
+            layer_peak_groups.append(former_peak_group_pair)
+            continue
+        # copy the former group content
+        new_peak_group = copy.deepcopy(former_peak_group_pair[1])
+        is_visited = set()
+        is_exceed = False
+        for echo_coord in new_peak_group:
+            if echo_coord not in is_visited:
+                is_visited.add(echo_coord)
+                stack = [echo_coord]
+                while stack:
+                    current_coord = stack.pop()
+                    for offset in SURROUNDING_OFFSETS:
+                        neighbour_coord = (current_coord[0] + offset[0], current_coord[1] + offset[1])
+                        neighbour_value = immerse_img.getpixel(neighbour_coord)
+                        neighbour_index = round(neighbour_value[0] / GRAY_SCALE_UNIT) - 1
+                        # Check neighbour index value
+                        if is_neg and 0 <= neighbour_index <= layer_idx:
+                            if neighbour_coord not in is_visited:
+                                is_visited.add(neighbour_coord)
+                                stack.append(neighbour_coord)
+                                new_peak_group.append(neighbour_coord)
+                        elif not is_neg and neighbour_index >= layer_idx:
+                            if neighbour_coord not in is_visited:
+                                is_visited.add(neighbour_coord)
+                                stack.append(neighbour_coord)
+                                new_peak_group.append(neighbour_coord)
+                    if len(new_peak_group) > AREA_MAXIMUM_THRESHOLD:
+                        is_exceed = True
+                        break
+        # Check whether the peak group has extended or not
+        if not is_exceed:
+            # Indicate that current peak group after extension satisfies the condition
+            # Add this group into new list
+            layer_peak_groups.append((0, new_peak_group))
+        else:
+            layer_peak_groups.append((1, former_peak_group_pair[1]))
+
+    return layer_peak_groups
+
+
+def get_init_regional_groups(layer_model: List[List[Tuple[int, int]]], layer_idx: int, immerse_img: Image)\
+        -> List[Tuple[int, List[Tuple[int, int]]]]:
+    # Initialize variables
+    init_regional_groups = []
+    is_visited = set()
+    # Iterate each echo in the current layer
+    for echo_coord in layer_model[layer_idx]:
+        if echo_coord not in is_visited:
+            is_visited.add(echo_coord)
+            new_init_peak_group = [echo_coord]
+            stack = [echo_coord]
+            is_not_isolated = False
+            while stack:
+                current_coord = stack.pop()
+                for offset in SURROUNDING_OFFSETS:
+                    neighbour_coord = (current_coord[0] + offset[0], current_coord[1] + offset[1])
+                    neighbour_value = immerse_img.getpixel(neighbour_coord)
+                    neighbour_index = round(neighbour_value[0] / GRAY_SCALE_UNIT) - 1
+                    if neighbour_index == layer_idx:
+                        if neighbour_coord not in is_visited:
+                            is_visited.add(neighbour_coord)
+                            stack.append(neighbour_coord)
+                            new_init_peak_group.append(neighbour_coord)
+                    elif neighbour_index != -1:
+                        # Indicates that current group is not an isolated group
+                        is_not_isolated = True
+            # First check whether the group is isolated or not
+            if not is_not_isolated:
+                # Check new initial peak group size with threshold
+                # Note that here use simple condition in case too strict condition check causes over-filter
+                if len(new_init_peak_group) <= AREA_MAXIMUM_THRESHOLD:
+                    init_regional_groups.append((0, new_init_peak_group))
+    return init_regional_groups
 
 
 def get_region_debug_img(region_groups: List[List[Tuple[int, int]]], refer_img: Image, debug_img_name: str, debug_output_path: Path):

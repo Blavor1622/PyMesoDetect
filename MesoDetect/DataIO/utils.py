@@ -45,7 +45,7 @@ def check_output_folder(output_folder_path: Union[str, Path], current_folder_nam
 """
 Utility Function: extract images path from given folder
 """
-def get_folder_image_paths(img_folder_path: Union[Path, str]) -> List[str]:
+def get_folder_image_paths(img_folder_path: Union[Path, str]) -> List[Path]:
     """
     Retrieves the full paths of image files in a given folder.
 
@@ -65,10 +65,9 @@ def get_folder_image_paths(img_folder_path: Union[Path, str]) -> List[str]:
     image_files = [file for file in all_files if os.path.splitext(file)[1].lower() in VALID_IMG_EXTENSION]
 
     # iterate image file names
-    image_paths = []
+    image_paths: List[Path] = []
     for image_name in image_files:
         image_path = img_folder_path / image_name
-        image_path = image_path.as_posix()
         image_paths.append(image_path)
 
     return image_paths
@@ -126,27 +125,30 @@ def visualize_result(folder_path: Path, gray_img: Image, result_name: str) -> st
 
 
 def print_detection_result(result: DetectionResult):
-    print("\n=== Detection Result ===")
-    print(f"Station Number: {result['station_number']}")
-    print(f"Scan Time (UTC): {result['scan_time']}")
+    if len(result['meso_list']) == 0:
+        print("[Info] No active mesocyclone detected.")
+    else:
+        print("-------------------------------------------------")
+        print("=== Detection Result ===")
+        print(f"Station Number: {result['station_number']}")
+        print(f"Scan Time (UTC): {result['scan_time']}")
 
-    print("\nMesocyclone List:")
-    for meso in result['meso_list']:
-        print(f"\nStorm Number: {meso['storm_num']}")
-        print(f"Logic Center: {meso['logic_center']}")
-        print(f"Radar Distance: {meso['radar_distance']}")
-        print(f"Radar Angle: {meso['radar_angle']}")
-        print(f"Shear Value: {meso['shear_value']}")
-        print(f"Negative Center: {meso['neg_center']}")
-        print(f"Max Negative Velocity: {meso['neg_max_velocity']}")
-        print(f"Positive Center: {meso['pos_center']}")
-        print(f"Max Positive Velocity: {meso['pos_max_velocity']}")
+        print("Mesocyclone List:")
+        for meso in result['meso_list']:
+            print(f"    Storm Number: {meso['storm_num']}")
+            print(f"    Logic Center: {meso['logic_center']}")
+            print(f"    Radar Distance: {meso['radar_distance']}")
+            print(f"    Radar Angle: {meso['radar_angle']}")
+            print(f"    Shear Value: {meso['shear_value']}")
+            print(f"    Negative Center: {meso['neg_center']}")
+            print(f"    Max Negative Velocity: {meso['neg_max_velocity']}")
+            print(f"    Positive Center: {meso['pos_center']}")
+            print(f"    Max Positive Velocity: {meso['pos_max_velocity']}\n")
 
-    print("\nResult Image Paths:")
-    for path in result['result_img_paths']:
-        print(f"- {path}")
-
-
+        print("Result Image Paths:")
+        for path in result['result_img_paths']:
+            print(f"- {path}")
+        print("-------------------------------------------------")
 
 
 """

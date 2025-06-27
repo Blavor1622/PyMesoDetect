@@ -63,17 +63,17 @@ def opposite_extrema_analysis(
     duration = end - start
     print(f"[Info] Duration of mesocyclone analysis: {duration:.4f} seconds")
 
-    print("------Detection Result------")
-    for idx, mesocyclone_dict in enumerate(mesocyclone_list, start=1):
-        print(f"\nMesocyclone #{idx}:")
-        print(f"    logic_center: {mesocyclone_dict['logic_center']}")
-        print(f"    radar_distance: {mesocyclone_dict['radar_distance']}")
-        print(f"    radar_angle: {mesocyclone_dict['radar_angle']}")
-        print(f"    shear_value: {mesocyclone_dict['shear_value']}")
-        print(f"    neg_center: {mesocyclone_dict['neg_center']}")
-        print(f"    neg_max_velocity: {mesocyclone_dict['neg_max_velocity']}")
-        print(f"    pos_center: {mesocyclone_dict['pos_center']}")
-        print(f"    pos_max_velocity: {mesocyclone_dict['pos_max_velocity']}")
+    # print("------Detection Result------")
+    # for idx, mesocyclone_dict in enumerate(mesocyclone_list, start=1):
+    #     print(f"\nMesocyclone #{idx}:")
+    #     print(f"    logic_center: {mesocyclone_dict['logic_center']}")
+    #     print(f"    radar_distance: {mesocyclone_dict['radar_distance']}")
+    #     print(f"    radar_angle: {mesocyclone_dict['radar_angle']}")
+    #     print(f"    shear_value: {mesocyclone_dict['shear_value']}")
+    #     print(f"    neg_center: {mesocyclone_dict['neg_center']}")
+    #     print(f"    neg_max_velocity: {mesocyclone_dict['neg_max_velocity']}")
+    #     print(f"    pos_center: {mesocyclone_dict['pos_center']}")
+    #     print(f"    pos_max_velocity: {mesocyclone_dict['pos_max_velocity']}")
 
     return mesocyclone_list
 
@@ -92,6 +92,7 @@ def validate_potential_meso(
         center = get_group_center(unfold_img, group)
         if not center is None:
             neg_centers.append(center)
+
     pos_centers = []
     for group in pos_peaks:
         center = get_group_center(unfold_img, group)
