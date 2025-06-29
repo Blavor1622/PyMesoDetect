@@ -1,6 +1,7 @@
 import math
 import time
 from MesoDetect.DataIO.utils import get_color_bar_info, get_radar_info
+from MesoDetect.DataIO.consts import PIXEL_KM_RATIO_PAIR
 from MesoDetect.DataIO.consts import GRAY_SCALE_UNIT
 from typing import List, Tuple, Optional
 from pathlib import Path
@@ -86,6 +87,13 @@ def validate_potential_meso(
         neg_peaks: List[List[Tuple[int, int]]],
         pos_peaks: List[List[Tuple[int, int]]],
 ) -> Optional[List[MesocycloneInfo]]:
+    # Get pixel distance-actual distance ratio
+    radar_img_size = get_radar_info("image_size")
+    if radar_img_size == PIXEL_KM_RATIO_PAIR[0][0]:
+        pixel_km_ratio = PIXEL_KM_RATIO_PAIR[0][1]
+    else:
+        pixel_km_ratio = PIXEL_KM_RATIO_PAIR[1][1]
+
     # Get group centers
     neg_centers = []
     for group in neg_peaks:
@@ -110,8 +118,9 @@ def validate_potential_meso(
             pos_center = pos_centers[pos_idx]
             # Calculate center distance
             center_distance = math.sqrt((neg_center[0] - pos_center[0]) ** 2 + (neg_center[1] - pos_center[1]) ** 2)
+            center_distance_km = center_distance * pixel_km_ratio
             # Check opposite extrema region center distance
-            if center_distance <= CENTER_DISTANCE_THRESHOLD:
+            if center_distance_km <= CENTER_DISTANCE_THRESHOLD:
                 # Get maxinum velocity value from extrema region
                 # For negative:
                 maximum_neg_velocity = 0
@@ -170,6 +179,7 @@ def validate_potential_meso(
                         # Calculate distance from radar center
                         radar_center_distance = math.sqrt(
                             (radar_center[0] - logic_center_x) ** 2 + (radar_center[1] - logic_center_y) ** 2)
+                        radar_center_distance_km = radar_center_distance * pixel_km_ratio
                         if radar_center_distance != 0.0:
                             cos_theta = -(logic_center_y - radar_center[1]) / radar_center_distance
                         else:
@@ -181,7 +191,7 @@ def validate_potential_meso(
                         mesocyclone_data: MesocycloneInfo = {
                             "storm_num": 0,
                             "logic_center": (logic_center_x, logic_center_y),
-                            "radar_distance": radar_center_distance,
+                            "radar_distance": radar_center_distance_km,
                             "radar_angle": theta_degrees,
                             "shear_value": avg_rotation,
                             "neg_center": neg_center,

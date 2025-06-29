@@ -15,8 +15,9 @@ CURRENT_DEBUG_RESULT_FOLDER = "MesocycloneAnalysis"
 
 
 CENTER_DIAMETER = 4
-# (183 - 65) pixels/ 50 km = 2.36 pixel per kilometer
-CENTER_DISTANCE_THRESHOLD = 24
+
+# km, threshold for neg and pos region center distance
+CENTER_DISTANCE_THRESHOLD = 6
 
 
 # m/s, threshold for the rotation speed of meso
@@ -24,4 +25,4 @@ MESO_ROTATION_THRESHOLD = 9.5
 
 
 # threshold for checking invalid echo ratio in the meso range
-VALID_MESO_ECHO_RATIO_THRESHOLD = 0.89
+VALID_MESO_ECHO_RATIO_THRESHOLD = 0.868

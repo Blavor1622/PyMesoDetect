@@ -1,0 +1,38 @@
+# Configuration for Radar Detection
+    image_size: [1024, 768] # size of radar image: [width, height]
+    
+    radar_center: [384, 384]  # List of 2 integers: [x, y]
+    
+    radar_zone: [38, 730]  # List of 2 integers: [x_min, x_max]
+        
+    color_velocity_pairs:  # List of color-velocity pairs
+      - - [0, 224, 255]  # RGB Color [R, G, B] (List of 3 integers)
+        - -27.5          # Velocity (Float)
+      - - [0, 128, 255]
+        - -23.5
+      - - [50, 0, 150]
+        - -17.5
+      - - [0, 251, 144]
+        - -12.5
+      - - [0, 187, 144]
+        - -7.5
+      - - [0, 143, 0]
+        - -3
+      - - [205, 192, 159]
+        - -0.5
+      - - [255, 255, 255]
+        - 0.5
+      - - [248, 135, 0]
+        - 3
+      - - [255, 207, 0]
+        - 7.5
+      - - [255, 255, 0]
+        - 12.5
+      - - [174, 0, 0]
+        - 17.5
+      - - [208, 112, 0]
+        - 23.5
+      - - [255, 0, 0]
+        - 27.5
+    
+    

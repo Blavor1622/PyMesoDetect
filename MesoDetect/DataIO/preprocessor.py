@@ -124,7 +124,7 @@ def read_radar_image(radar_img_path: Path, station_num: str, image_debug_folder_
 
     end = time.time()
     duration = end - start
-    print(f'[Info] duration of radar reading: {duration:.4f} seconds')
+    print(f'[Info] Duration of radar reading: {duration:.4f} seconds')
     return gray_img
 
 

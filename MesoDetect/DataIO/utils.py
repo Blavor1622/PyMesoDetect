@@ -212,6 +212,7 @@ def pack_detection_result(
         result_image_paths.append(result_image_path.as_posix())
 
     detection_result: DetectionResult = {
+        "input_img_path": resolved_img_path.as_posix(),
         "station_number": station_number,
         "scan_time": resolved_scan_time,
         "meso_list": meso_list,

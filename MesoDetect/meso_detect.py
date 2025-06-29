@@ -6,10 +6,63 @@ from MesoDetect.RadarDenoise.denoise import radar_denoise
 from MesoDetect.DataIO.utils import visualize_result, pack_detection_result, print_detection_result
 from MesoDetect.ImmerseSimulation.peak_detector import get_extrema_regions
 from MesoDetect.MesocycloneAnalysis.meso_analysis import opposite_extrema_analysis
-from typing import Union, Optional, List
+from typing import Union, Optional, List, Callable
 from pathlib import Path
 from MesoDetect.DataIO.consts import DetectionResult
 from MesoDetect.DataIO.utils import get_folder_image_paths, check_output_folder
+
+
+def meso_detect_with_progress(
+        img_path: Path,
+        output_folder_path: Path,
+        update_progress: Callable[[int, int], None]
+) -> Optional[List[DetectionResult]]:
+    total_steps = 5
+    step = 0
+
+    # 1. Setup config
+    setup_result = setup_config(img_path, output_folder_path, "", True)
+    if setup_result is None:
+        return None
+    station_num, resolved_img_path, output_path = setup_result
+    step += 1
+    update_progress(step, total_steps)
+
+    # 2. Preprocess image
+    gray_img = radar_image_preprocess(resolved_img_path, station_num, output_path, False)
+    if gray_img is None:
+        return None
+    step += 1
+    update_progress(step, total_steps)
+
+    # 3. Denoise
+    unfold_img = radar_denoise(gray_img, output_path, False)
+    if unfold_img is None:
+        return None
+    step += 1
+    update_progress(step, total_steps)
+
+    # 4. Immerse simulation
+    immerse_result = get_extrema_regions(unfold_img, output_path, False)
+    if immerse_result is None:
+        return None
+    neg_regions, pos_regions = immerse_result
+    step += 1
+    update_progress(step, total_steps)
+
+    # 5. Mesocyclone analysis
+    meso_list = opposite_extrema_analysis(unfold_img, neg_regions, pos_regions, output_path, False)
+    if meso_list is None:
+        return None
+
+    result = pack_detection_result(station_num, resolved_img_path, unfold_img, meso_list, output_path)
+    step += 1
+    update_progress(step, total_steps)
+
+    print([result])
+    return [result]
+
+
 
 
 def meso_detect(
