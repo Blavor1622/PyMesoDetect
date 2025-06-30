@@ -23,6 +23,3 @@ cd doppler-mesocyclone-detection
 
 # Install dependencies
 pip install -r requirements.txt
-
-# Run the program
-
