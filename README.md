@@ -23,3 +23,8 @@ cd doppler-mesocyclone-detection
 
 # Install dependencies
 pip install -r requirements.txt
+
+# Usage
+input_image_path = ""
+output_path = ""
+detection_result = meso_detect(input_image_path, output_path) 
